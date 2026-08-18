@@ -135,9 +135,17 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
           ]);
         }
 
-        setExamYear('1405');
-        setExamMonth('10');
-        setExamDay('15');
+        try {
+          const today = new DateObject({ calendar: persian, locale: persian_fa });
+          setExamYear(today.year.toString());
+          setExamMonth(today.month.number.toString().padStart(2, '0'));
+          setExamDay(today.day.toString().padStart(2, '0'));
+        } catch (error) {
+          // Fallback if anything goes wrong
+          setExamYear('1405');
+          setExamMonth('10');
+          setExamDay('15');
+        }
         setExamStartTime('08:30');
         setExamEndTime('10:30');
         setExamNotes('');
