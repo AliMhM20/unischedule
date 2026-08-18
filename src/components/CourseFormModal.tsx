@@ -7,7 +7,9 @@ import { Course, ClassSession, DayOfWeek, ExamInfo } from '../types/schedule';
 import { 
   DAYS_CONFIG, COLOR_PALETTE, validateCourse, toPersianDigits 
 } from '../utils/timeUtils';
-import { ShamsiDateWheelPicker } from './ShamsiDateWheelPicker';
+import DatePicker, { DateObject } from "react-multi-date-picker";
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
 
 interface CourseFormModalProps {
   isOpen: boolean;
@@ -230,7 +232,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
       name: name.trim(),
       code: code.trim() || undefined,
       instructor: instructor.trim() || undefined,
-      credits: Number(credits) || 3,
+      credits: typeof credits === 'number' ? credits : 3,
       color,
       sessions,
       exam: currentExamInfo,
@@ -366,7 +368,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   تعداد واحد درس
                 </label>
                 <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((u) => (
+                  {[0, 1, 2, 3, 4, 5].map((u) => (
                     <button
                       key={u}
                       type="button"
@@ -539,22 +541,30 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
           {activeTab === 'exam' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               
-              {/* Date Wheel Picker */}
+              {/* Date Picker */}
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-slate-700">
                   تاریخ امتحان پایان ترم:
                 </label>
 
-                <ShamsiDateWheelPicker
-                  year={examYear}
-                  month={examMonth}
-                  day={examDay}
-                  onChange={(y, m, d) => {
-                    setExamYear(y);
-                    setExamMonth(m);
-                    setExamDay(d);
-                  }}
-                />
+                <div className="w-full">
+                  <DatePicker
+                    value={examYear && examMonth && examDay ? new DateObject({ date: `${examYear}/${examMonth}/${examDay}`, format: "YYYY/MM/DD", calendar: persian, locale: persian_fa }) : ""}
+                    onChange={(date: DateObject | null) => {
+                      if (date) {
+                        setExamYear(date.year.toString());
+                        setExamMonth(date.month.number.toString().padStart(2, '0'));
+                        setExamDay(date.day.toString().padStart(2, '0'));
+                      }
+                    }}
+                    calendar={persian}
+                    locale={persian_fa}
+                    format="dddd YYYY/MM/DD"
+                    calendarPosition="bottom-right"
+                    containerClassName="w-full"
+                    inputClass="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow dir-ltr text-center"
+                  />
+                </div>
               </div>
 
               {/* Exam Time */}

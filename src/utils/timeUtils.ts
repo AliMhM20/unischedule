@@ -1,5 +1,9 @@
 import { ClassSession, Course, DayOfWeek, ExamInfo, ScheduleConflict } from '../types/schedule';
 
+import DateObject from "react-date-object";
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
+
 export const DAYS_CONFIG: { id: DayOfWeek; fa: string; faShort: string; en: string }[] = [
   { id: 'saturday', fa: 'شنبه', faShort: 'شن', en: 'Saturday' },
   { id: 'sunday', fa: 'یک‌شنبه', faShort: 'یک', en: 'Sunday' },
@@ -76,6 +80,17 @@ export function toPersianDigits(num: number | string): string {
   return num
     .toString()
     .replace(/\d/g, (x) => farsiDigits[parseInt(x, 10)]);
+}
+
+// Format exam date to include day of week (e.g. "شنبه ۱۴۰۵/۰۹/۲۱")
+export function formatExamDate(dateStr: string): string {
+  if (!dateStr || !dateStr.includes('/')) return toPersianDigits(dateStr);
+  try {
+    const dateObj = new DateObject({ date: dateStr, format: "YYYY/MM/DD", calendar: persian, locale: persian_fa });
+    return toPersianDigits(dateObj.format("dddd YYYY/MM/DD"));
+  } catch (e) {
+    return toPersianDigits(dateStr);
+  }
 }
 
 // Day name in Persian

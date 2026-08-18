@@ -4,7 +4,7 @@ import {
   BookOpen, Plus, Trash2, Edit, Clock, 
   User, Calendar, Search
 } from 'lucide-react';
-import { toPersianDigits, getDayFaName, getCourseTheme } from '../utils/timeUtils';
+import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
 
 interface CourseListSidebarProps {
   courses: Course[];
@@ -44,7 +44,7 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="text-xs font-extrabold text-slate-500">مجموع واحدهای انتخابی:</span>
-          <span className="text-xl font-black font-mono text-indigo-700">
+          <span className="text-xl font-black text-indigo-700">
             {toPersianDigits(totalCredits)} <span className="text-xs font-normal">واحد</span>
           </span>
         </div>
@@ -147,7 +147,7 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
                   {course.exam?.date && (
                     <div className="text-[10px] text-indigo-700 bg-indigo-50/70 px-1.5 py-0.5 rounded mt-1.5 flex items-center gap-1 font-medium truncate">
                       <Calendar className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
-                      <span className="truncate">امتحان: {toPersianDigits(course.exam.date)} (ساعت {toPersianDigits(course.exam.startTime)})</span>
+                      <span className="truncate">امتحان: {formatExamDate(course.exam.date)} (ساعت {toPersianDigits(course.exam.startTime)})</span>
                     </div>
                   )}
                 </div>

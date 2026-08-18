@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle2, Edit } from 'lucide-react';
 import { Course } from '../types/schedule';
-import { COLOR_PALETTE, toPersianDigits, findExamConflicts } from '../utils/timeUtils';
+import { COLOR_PALETTE, toPersianDigits, findExamConflicts, formatExamDate } from '../utils/timeUtils';
 
 interface ExamTimelineViewProps {
   courses: Course[];
@@ -172,8 +172,8 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                       <Calendar className="w-3.5 h-3.5 text-indigo-600" />
                       تاریخ برگزاری:
                     </span>
-                    <span className="font-mono font-bold text-slate-900 text-sm bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                      {toPersianDigits(exam?.date || 'مشخص نشده')}
+                    <span className="font-bold text-slate-900 text-sm bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                      {exam?.date ? formatExamDate(exam.date) : 'مشخص نشده'}
                     </span>
                   </div>
 
@@ -182,7 +182,7 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                       <Clock className="w-3.5 h-3.5 text-indigo-600" />
                       ساعت آزمون:
                     </span>
-                    <span className="font-mono font-bold text-slate-800">
+                    <span className="font-bold text-slate-800">
                       {toPersianDigits(`${exam?.startTime || '--:--'} الی ${exam?.endTime || '--:--'}`)}
                     </span>
                   </div>

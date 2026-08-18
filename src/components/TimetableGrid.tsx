@@ -4,7 +4,7 @@ import {
   Plus, Calendar, Clock, User, AlertTriangle, 
   Trash2, Edit, X, Info
 } from 'lucide-react';
-import { toPersianDigits, getDayFaName, getCourseTheme } from '../utils/timeUtils';
+import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
 
 interface TimetableGridProps {
   courses: Course[];
@@ -133,7 +133,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           
           {/* Days Column Header */}
           <div className="w-16 sm:w-20 md:w-24 shrink-0 py-2.5 sm:py-3 px-1 text-center border-l border-slate-200 flex items-center justify-center text-slate-700 font-black bg-slate-100 text-[11px] sm:text-xs">
-            روز هفته
+            
           </div>
 
           {/* Time Slots Header (07:00 to 19:00) */}
@@ -147,9 +147,6 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 
               // Position alignment for edge safety
               let transformClass = 'translate(50%, -50%)';
-              if (index === 0) {
-                transformClass = 'translate(10%, -50%)'; // 07:00 at right edge
-              }
 
               return (
                 <React.Fragment key={hour}>
@@ -161,10 +158,10 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                       transform: transformClass,
                     }}
                   >
-                    <span className="hidden sm:inline font-mono font-bold text-[10.5px] text-slate-800 bg-slate-100/95 px-1 py-0.5 rounded shadow-2xs">
+                    <span className="hidden sm:inline font-bold text-[10.5px] text-slate-800 bg-slate-100/95 px-1 py-0.5 rounded shadow-2xs">
                       {toPersianDigits(fullTimeString)}
                     </span>
-                    <span className="sm:hidden font-mono font-bold text-[9px] text-slate-800 bg-slate-100/95 px-0.5 py-0.2 rounded shadow-2xs">
+                    <span className="sm:hidden font-bold text-[9px] text-slate-800 bg-slate-100/95 px-0.5 py-0.2 rounded shadow-2xs">
                       {toPersianDigits(shortTimeString)}
                     </span>
                   </div>
@@ -314,8 +311,8 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 
                         {/* Time & Exam indicator */}
                         <div className="mt-0.5 pt-0.5 border-t border-current/10 flex items-center justify-between text-[9px] sm:text-[10px] font-bold">
-                          <span className="opacity-90 font-mono dir-ltr truncate">
-                            {toPersianDigits(`${session.startTime} - ${session.endTime}`)}
+                          <span className="opacity-90 truncate text-right">
+                            {toPersianDigits(session.endTime)} - {toPersianDigits(session.startTime)}
                           </span>
                           {course.exam?.date && (
                             <span className="hidden sm:inline-flex text-[8.5px] px-1 py-0.2 rounded bg-black/10 items-center gap-0.5 font-medium shrink-0">
@@ -370,7 +367,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               {selectedCourseCard.course.code && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">کد درس:</span>
-                  <span className="font-mono font-bold">{selectedCourseCard.course.code}</span>
+                  <span className="font-bold">{selectedCourseCard.course.code}</span>
                 </div>
               )}
               {selectedCourseCard.course.instructor && (
@@ -389,7 +386,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                 <div className="flex items-center justify-between text-indigo-700 font-bold pt-1 border-t border-slate-200">
                   <span>تاریخ آزمون پایان ترم:</span>
                   <span>
-                    {toPersianDigits(selectedCourseCard.course.exam.date)} (ساعت {toPersianDigits(selectedCourseCard.course.exam.startTime)})
+                    {formatExamDate(selectedCourseCard.course.exam.date)} (ساعت {toPersianDigits(selectedCourseCard.course.exam.startTime)})
                   </span>
                 </div>
               )}
