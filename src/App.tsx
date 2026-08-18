@@ -15,7 +15,7 @@ const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
 
 export default function App() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<'grid' | 'exams' | 'help'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'help'>('grid');
   const [showFriday, setShowFriday] = useState<boolean>(false);
 
   // Plans state - Defaults to empty schedule for new users
@@ -220,20 +220,18 @@ export default function App() {
               />
             </div>
 
-          </div>
-        )}
+            {/* 3. Exam Timeline (Below Timetable) */}
+            <div className="w-full pt-4">
+              <ExamTimelineView
+                courses={activePlan.courses}
+                onEditCourse={(course) => {
+                  setEditingCourse(course);
+                  setPrefilledSlot(null);
+                  setIsFormModalOpen(true);
+                }}
+              />
+            </div>
 
-        {/* TAB 2: EXAM TIMELINE & CONFLICTS */}
-        {activeTab === 'exams' && (
-          <div className="w-full">
-            <ExamTimelineView
-              courses={activePlan.courses}
-              onEditCourse={(course) => {
-                setEditingCourse(course);
-                setPrefilledSlot(null);
-                setIsFormModalOpen(true);
-              }}
-            />
           </div>
         )}
 

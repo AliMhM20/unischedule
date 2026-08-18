@@ -7,8 +7,8 @@ import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
 
 interface NavbarProps {
-  activeTab: 'grid' | 'exams' | 'help';
-  setActiveTab: (tab: 'grid' | 'exams' | 'help') => void;
+  activeTab: 'grid' | 'help';
+  setActiveTab: (tab: 'grid' | 'help') => void;
   onOpenAddModal: () => void;
   plans: SchedulePlan[];
   activePlanId: string;
@@ -51,19 +51,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             جدول هفتگی کلاس‌ها
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('exams')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'exams'
-                ? 'bg-white text-indigo-600 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            تقویم امتحانات پایان ترم
           </button>
 
           <button
@@ -147,19 +134,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <LayoutGrid className="w-3.5 h-3.5" />
           <span>جدول هفتگی</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('exams')}
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold py-1.5 px-2 rounded-lg transition-all ${
-            activeTab === 'exams' 
-              ? 'bg-white text-indigo-600 shadow-xs border border-slate-200' 
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Calendar className="w-3.5 h-3.5" />
-          <span>امتحانات</span>
         </button>
 
         <button

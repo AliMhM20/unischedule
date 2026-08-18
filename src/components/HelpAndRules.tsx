@@ -61,7 +61,7 @@ export const HelpAndRules: React.FC = () => {
           امکانات و نکات سرعت عمل در کار با سامانه
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs text-slate-600">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600">
           
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
             <div className="font-bold text-slate-800">🖱️ کلیک مستقیم روی جدول:</div>
@@ -81,16 +81,6 @@ export const HelpAndRules: React.FC = () => {
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
             <div className="font-bold text-slate-800">🖨️ چاپ و خروجی PDF:</div>
             <div>با زدن دکمه پرینتر در نوار بالا، جدول هفتگی آماده ذخیره به صورت فایل PDF یا تصویر برای اشتراک با دوستان می‌شود.</div>
-          </div>
-
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-            <div className="font-bold text-slate-800">⚡ بدون نیاز به تایپ ساعت:</div>
-            <div>انتخاب روزها، ساعت‌ها و تاریخ امتحان کاملاً به صورت دکمه‌های تعاملی و پیش‌فرض‌های دانشگاهی طراحی شده است.</div>
-          </div>
-
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-            <div className="font-bold text-slate-800">📊 شمارنده هوشمند واحدها:</div>
-            <div>سیستم وضعیت حداقل و حداکثر واحدهای انتخابی (۱۲ تا ۲۰ یا ۲۴ واحد) را به طور مستمر پایش می‌کند.</div>
           </div>
 
         </div>

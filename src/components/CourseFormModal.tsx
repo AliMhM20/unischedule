@@ -165,11 +165,38 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   if (!isOpen) return null;
 
   const handleAddSession = () => {
+    // Determine the next logical day based on the first session (if it exists)
+    let nextDay: DayOfWeek = 'monday';
+    let nextStart = '10:00';
+    let nextEnd = '12:00';
+
+    if (sessions.length > 0) {
+      const firstSession = sessions[0];
+      nextStart = firstSession.startTime;
+      nextEnd = firstSession.endTime;
+      
+      const dayOrder: DayOfWeek[] = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      const firstIdx = dayOrder.indexOf(firstSession.day);
+      
+      if (firstIdx !== -1) {
+        if (firstIdx >= 0 && firstIdx <= 2) {
+          // Saturday to Monday -> 2 days later
+          nextDay = dayOrder[firstIdx + 2];
+        } else if (firstIdx === 3 || firstIdx === 4) {
+          // Tuesday, Wednesday -> 2 days before
+          nextDay = dayOrder[firstIdx - 2];
+        } else {
+          // Thursday, Friday -> same day
+          nextDay = firstSession.day;
+        }
+      }
+    }
+
     const newSession: ClassSession = {
       id: `session-${Date.now()}`,
-      day: 'monday',
-      startTime: '10:00',
-      endTime: '12:00',
+      day: nextDay,
+      startTime: nextStart,
+      endTime: nextEnd,
     };
     setSessions([...sessions, newSession]);
   };
