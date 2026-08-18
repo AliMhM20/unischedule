@@ -59,6 +59,35 @@ export default function App() {
     createdAt: Date.now(),
   };
 
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('theme_preference');
+        if (saved) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  });
+
+  // Apply theme to html element
+  useEffect(() => {
+    try {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme_preference', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme_preference', 'light');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [isDarkMode]);
+
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -156,7 +185,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-['Vazirmatn',sans-serif] w-full overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#131416] dark:text-slate-100 flex flex-col font-['Vazirmatn',sans-serif] w-full overflow-x-hidden transition-colors duration-200">
       
       {/* Top Bar Header */}
       <Navbar
@@ -172,6 +201,8 @@ export default function App() {
         onSelectPlan={(id) => setActivePlanId(id)}
         onAddPlan={handleAddNewPlan}
         onPrint={handlePrint}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={() => setIsDarkMode((prev) => !prev)}
       />
 
       {/* Main Content Area: 100% Fluid Width */}

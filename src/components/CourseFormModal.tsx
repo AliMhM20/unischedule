@@ -254,20 +254,20 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#1c1d21] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#2a2b30] overflow-hidden my-8 max-h-[92vh] flex flex-col transition-colors duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-[#2a2b30] bg-slate-50/70 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
             <div className={`w-3.5 h-3.5 rounded-full ${COLOR_PALETTE.find(c => c.id === color)?.bg || 'bg-blue-500'}`} />
-            <h2 className="text-lg font-bold text-slate-800">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
               {isEditing ? 'ویرایش مشخصات درس' : 'افزودن درس جدید'}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-lg transition-colors cursor-pointer"
             title="بستن"
           >
             <X className="w-5 h-5" />
@@ -275,14 +275,14 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 bg-white px-6 gap-2 pt-2">
+        <div className="flex border-b border-slate-200 dark:border-[#2a2b30] bg-white dark:bg-[#1c1d21] px-6 gap-2 pt-2">
           <button
             type="button"
             onClick={() => setActiveTab('details')}
-            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'details'
-                ? 'border-indigo-600 text-indigo-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 dark:border-emerald-500 text-indigo-600 dark:text-emerald-400 font-bold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -291,25 +291,25 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('sessions')}
-            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'sessions'
-                ? 'border-indigo-600 text-indigo-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 dark:border-emerald-500 text-indigo-600 dark:text-emerald-400 font-bold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Clock className="w-4 h-4" />
             جلسات هفتگی
-            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">
+            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded-full font-bold">
               {toPersianDigits(sessions.length)}
             </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('exam')}
-            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 py-2.5 px-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'exam'
-                ? 'border-indigo-600 text-indigo-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 dark:border-emerald-500 text-indigo-600 dark:text-emerald-400 font-bold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Calendar className="w-4 h-4" />
@@ -326,7 +326,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               
               {/* Course Name */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   نام درس <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -335,15 +335,15 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="نام درس را وارد کنید"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 text-sm font-medium"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 focus:border-indigo-500 dark:focus:border-emerald-500 text-slate-800 dark:text-slate-100 text-sm font-medium transition-colors"
                 />
               </div>
 
               {/* Code & Instructor */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-slate-600" />
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                     نام استاد / مدرس (اختیاری)
                   </label>
                   <input
@@ -351,13 +351,13 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                     value={instructor}
                     onChange={(e) => setInstructor(e.target.value)}
                     placeholder="مثال: دکتر علوی"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <Hash className="w-4 h-4 text-slate-600" />
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <Hash className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                     کد درس و گروه (اختیاری)
                   </label>
                   <input
@@ -365,14 +365,14 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="مثال: 102-01"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
                   />
                 </div>
               </div>
 
               {/* Credits (Units) */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   تعداد واحد درس
                 </label>
                 <div className="flex items-center gap-2">
@@ -381,10 +381,10 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                       key={u}
                       type="button"
                       onClick={() => setCredits(u)}
-                      className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
+                      className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
                         credits === u
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          ? 'bg-indigo-600 dark:bg-[#00B87C] text-white dark:text-black border-indigo-600 dark:border-emerald-600 shadow-xs'
+                          : 'bg-white dark:bg-[#131416] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-[#383a40] hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       {toPersianDigits(u)} واحد
@@ -395,7 +395,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
               {/* Color Theme */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   رنگ درس در جدول برنامه
                 </label>
                 <div className="grid grid-cols-5 gap-2.5">
@@ -404,10 +404,10 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                       key={pal.id}
                       type="button"
                       onClick={() => setColor(pal.id)}
-                      className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-medium transition-all ${
+                      className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                         color === pal.id
-                          ? 'ring-2 ring-indigo-500 ring-offset-2 border-transparent font-bold shadow-xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'ring-2 ring-indigo-500 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900 border-transparent font-bold shadow-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800'
+                          : 'border-slate-200 dark:border-[#383a40] hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-[#131416] text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <span className={`w-3.5 h-3.5 rounded-full ${pal.bg} shrink-0`} />
@@ -419,7 +419,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   توضیحات و یادداشت (اختیاری)
                 </label>
                 <input
@@ -427,7 +427,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="یادداشت‌های مربوط به درس"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
                 />
               </div>
 
@@ -439,12 +439,12 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">جلسات کلاسی هفتگی</h3>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">جلسات کلاسی هفتگی</h3>
                 </div>
                 <button
                   type="button"
                   onClick={handleAddSession}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors border border-indigo-200"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-emerald-900/30 hover:bg-indigo-100 dark:hover:bg-emerald-900/50 text-indigo-700 dark:text-emerald-400 text-xs font-bold rounded-lg transition-colors border border-indigo-200 dark:border-emerald-800/50 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   افزودن جلسه دوم
@@ -454,12 +454,12 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               {sessions.map((session, index) => (
                 <div 
                   key={session.id || index}
-                  className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4 relative"
+                  className="p-4 rounded-xl border border-slate-200 dark:border-[#2a2b30] bg-slate-50/70 dark:bg-[#1c1d21]/70 space-y-4 relative"
                 >
                   {/* Session Header */}
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#2a2b30]">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center text-xs">
                         {toPersianDigits(index + 1)}
                       </span>
                       جلسه {index === 0 ? 'اول' : 'دوم'}
@@ -468,7 +468,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveSession(index)}
-                        className="text-rose-500 hover:text-rose-700 text-xs flex items-center gap-1 p-1 hover:bg-rose-50 rounded-md transition-colors"
+                        className="text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 text-xs flex items-center gap-1 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         حذف این جلسه
@@ -478,7 +478,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
                   {/* Day Picker Buttons */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
                       روز برگزاری:
                     </label>
                     <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
@@ -487,10 +487,10 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                           key={d.id}
                           type="button"
                           onClick={() => handleUpdateSession(index, 'day', d.id)}
-                          className={`py-2 px-1 rounded-lg text-xs font-bold border transition-all ${
+                          className={`py-2 px-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                             session.day === d.id
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              ? 'bg-indigo-600 dark:bg-[#00B87C] text-white dark:text-black border-indigo-600 dark:border-emerald-600 shadow-xs'
+                              : 'bg-white dark:bg-[#131416] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#2a2b30] hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
                           {d.fa}
@@ -500,18 +500,18 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   </div>
 
                   {/* Class Time Selector */}
-                  <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-                    <div className="text-xs font-bold text-slate-700 mb-2.5 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-indigo-600" />
+                  <div className="bg-white dark:bg-[#1c1d21] p-3.5 rounded-xl border border-slate-200 dark:border-[#2a2b30]">
+                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2.5 flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-indigo-600 dark:text-emerald-500" />
                       ساعت برگزاری کلاس:
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
-                        <span className="text-xs font-medium text-slate-500 block mb-1">ساعت شروع:</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
                         <select
                           value={session.startTime}
                           onChange={(e) => handleUpdateSession(index, 'startTime', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
                         >
                           {CLASS_START_HOURS.map((t) => (
                             <option key={t} value={t}>
@@ -524,11 +524,11 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                       <span className="text-slate-400 font-bold text-sm mt-5">تا</span>
 
                       <div className="flex-1">
-                        <span className="text-xs font-medium text-slate-500 block mb-1">ساعت پایان:</span>
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
                         <select
                           value={session.endTime}
                           onChange={(e) => handleUpdateSession(index, 'endTime', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
                         >
                           {CLASS_END_HOURS.map((t) => (
                             <option key={t} value={t}>
@@ -551,7 +551,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               
               {/* Date Picker */}
               <div className="space-y-2">
-                <label className="block text-sm font-bold text-slate-700">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
                   تاریخ امتحان پایان ترم:
                 </label>
 
@@ -570,25 +570,25 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                     format="dddd YYYY/MM/DD"
                     calendarPosition="bottom-right"
                     containerClassName="w-full"
-                    inputClass="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow dir-ltr text-center"
+                    inputClass="w-full px-4 py-2.5 bg-white dark:bg-[#131416] rounded-xl border border-slate-300 dark:border-[#383a40] text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 transition-shadow dir-ltr text-center"
                   />
                 </div>
               </div>
 
               {/* Exam Time */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
+              <div className="bg-slate-50 dark:bg-[#1c1d21]/50 p-4 rounded-xl border border-slate-200 dark:border-[#2a2b30] space-y-3">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-600 dark:text-emerald-500" />
                   ساعت برگزاری امتحان:
                 </label>
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <span className="text-xs text-slate-500 block mb-1">ساعت شروع:</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
                     <select
                       value={examStartTime}
                       onChange={(e) => setExamStartTime(e.target.value)}
-                      className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="w-full p-2 bg-white dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
                     >
                       {EXAM_START_HOURS.map((t) => (
                         <option key={t} value={t}>{toPersianDigits(t)}</option>
@@ -597,11 +597,11 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   </div>
                   <span className="text-slate-400 font-bold text-sm mt-4">تا</span>
                   <div className="flex-1">
-                    <span className="text-xs text-slate-500 block mb-1">ساعت پایان:</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
                     <select
                       value={examEndTime}
                       onChange={(e) => setExamEndTime(e.target.value)}
-                      className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="w-full p-2 bg-white dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
                     >
                       {EXAM_END_HOURS.map((t) => (
                         <option key={t} value={t}>{toPersianDigits(t)}</option>
@@ -613,7 +613,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
               {/* Exam Notes */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   یادداشت امتحان (اختیاری):
                 </label>
                 <input
@@ -621,7 +621,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   value={examNotes}
                   onChange={(e) => setExamNotes(e.target.value)}
                   placeholder="مثال: ماشین حساب مجاز است"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
                 />
               </div>
 
@@ -630,12 +630,12 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
 
           {/* REALTIME CONFLICT WARNING */}
           {validationResult.hasConflict ? (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2 animate-in slide-in-from-top duration-200">
+            <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 space-y-2 animate-in slide-in-from-top duration-200">
               <div className="flex items-center gap-2 font-bold text-sm">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
                 <span>خطای تداخل زمانی:</span>
               </div>
-              <ul className="space-y-1 text-xs text-rose-700 list-disc list-inside mr-2">
+              <ul className="space-y-1 text-xs text-rose-700 dark:text-rose-400 list-disc list-inside mr-2">
                 {validationResult.conflicts.map((conf, i) => (
                   <li key={i} className="leading-relaxed font-medium">
                     {conf.reason}
@@ -644,20 +644,20 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               </ul>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-800 rounded-lg text-xs border border-emerald-200 font-medium">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 rounded-lg text-xs border border-emerald-200 dark:border-emerald-800/50 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>بدون تداخل زمانی</span>
             </div>
           )}
 
           {/* Actions Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-[#2a2b30]">
             <div className="flex items-center gap-2">
               {activeTab !== 'details' && (
                 <button
                   type="button"
                   onClick={() => setActiveTab(activeTab === 'exam' ? 'sessions' : 'details')}
-                  className="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                 >
                   مرحله قبلی
                 </button>
@@ -666,7 +666,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab(activeTab === 'details' ? 'sessions' : 'exam')}
-                  className="px-3.5 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
+                  className="px-3.5 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
                   مرحله بعدی
                 </button>
@@ -677,17 +677,17 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               >
                 انصراف
               </button>
               <button
                 type="submit"
                 disabled={validationResult.hasConflict || !name.trim()}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer ${
                   validationResult.hasConflict || !name.trim()
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer hover:shadow-md active:scale-95'
+                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50'
+                    : 'bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black hover:shadow-md active:scale-95'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />

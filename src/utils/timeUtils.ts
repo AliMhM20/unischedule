@@ -15,16 +15,16 @@ export const DAYS_CONFIG: { id: DayOfWeek; fa: string; faShort: string; en: stri
 ];
 
 export const COLOR_PALETTE = [
-  { id: 'blue', bg: 'bg-blue-500', text: 'text-white', lightBg: 'bg-blue-50 text-blue-700 border-blue-200', hex: '#3b82f6', label: 'آبی اقیانوسی' },
-  { id: 'emerald', bg: 'bg-emerald-500', text: 'text-white', lightBg: 'bg-emerald-50 text-emerald-700 border-emerald-200', hex: '#10b981', label: 'سبز زمردی' },
-  { id: 'violet', bg: 'bg-violet-500', text: 'text-white', lightBg: 'bg-violet-50 text-violet-700 border-violet-200', hex: '#8b5cf6', label: 'بنفش سلطنتی' },
-  { id: 'amber', bg: 'bg-amber-500', text: 'text-white', lightBg: 'bg-amber-50 text-amber-800 border-amber-200', hex: '#f59e0b', label: 'کهربایی' },
-  { id: 'rose', bg: 'bg-rose-500', text: 'text-white', lightBg: 'bg-rose-50 text-rose-700 border-rose-200', hex: '#f43f5e', label: 'سرخ گلی' },
-  { id: 'cyan', bg: 'bg-cyan-500', text: 'text-white', lightBg: 'bg-cyan-50 text-cyan-800 border-cyan-200', hex: '#06b6d4', label: 'فیروزه‌ای' },
-  { id: 'indigo', bg: 'bg-indigo-500', text: 'text-white', lightBg: 'bg-indigo-50 text-indigo-700 border-indigo-200', hex: '#6366f1', label: 'نیلی' },
-  { id: 'teal', bg: 'bg-teal-500', text: 'text-white', lightBg: 'bg-teal-50 text-teal-700 border-teal-200', hex: '#14b8a6', label: 'یشمی' },
-  { id: 'orange', bg: 'bg-orange-500', text: 'text-white', lightBg: 'bg-orange-50 text-orange-800 border-orange-200', hex: '#f97316', label: 'نارنجی پرتقالی' },
-  { id: 'pink', bg: 'bg-pink-500', text: 'text-white', lightBg: 'bg-pink-50 text-pink-700 border-pink-200', hex: '#ec4899', label: 'صورتی روشن' },
+  { id: 'blue', bg: 'bg-blue-500', text: 'text-white', lightBg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700', hex: '#3b82f6', label: 'آبی اقیانوسی' },
+  { id: 'emerald', bg: 'bg-emerald-500', text: 'text-white', lightBg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700', hex: '#10b981', label: 'سبز زمردی' },
+  { id: 'violet', bg: 'bg-violet-500', text: 'text-white', lightBg: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900 dark:text-violet-300 dark:border-violet-700', hex: '#8b5cf6', label: 'بنفش سلطنتی' },
+  { id: 'amber', bg: 'bg-amber-500', text: 'text-white', lightBg: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700', hex: '#f59e0b', label: 'کهربایی' },
+  { id: 'rose', bg: 'bg-rose-500', text: 'text-white', lightBg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900 dark:text-rose-300 dark:border-rose-700', hex: '#f43f5e', label: 'سرخ گلی' },
+  { id: 'cyan', bg: 'bg-cyan-500', text: 'text-white', lightBg: 'bg-cyan-50 text-cyan-800 border-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-700', hex: '#06b6d4', label: 'فیروزه‌ای' },
+  { id: 'indigo', bg: 'bg-indigo-500', text: 'text-white', lightBg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900 dark:text-indigo-300 dark:border-indigo-700', hex: '#6366f1', label: 'نیلی' },
+  { id: 'teal', bg: 'bg-teal-500', text: 'text-white', lightBg: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-700', hex: '#14b8a6', label: 'یشمی' },
+  { id: 'orange', bg: 'bg-orange-500', text: 'text-white', lightBg: 'bg-orange-50 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-700', hex: '#f97316', label: 'نارنجی پرتقالی' },
+  { id: 'pink', bg: 'bg-pink-500', text: 'text-white', lightBg: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900 dark:text-pink-300 dark:border-pink-700', hex: '#ec4899', label: 'صورتی روشن' },
 ];
 
 export const UNIVERSITY_TIME_PRESETS = [

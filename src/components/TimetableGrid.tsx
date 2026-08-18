@@ -96,16 +96,16 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   });
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+    <div className="w-full bg-white dark:bg-[#1c1d21] rounded-2xl border border-indigo-200 dark:border-[#00B87C]/50 overflow-hidden shadow-xs transition-colors duration-200">
       
       {/* Grid Top Header: Title & Quick controls */}
-      <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-200 bg-white flex items-center justify-between gap-3">
+      <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-200 dark:border-[#2a2b30] bg-white dark:bg-[#1c1d21] flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
-          <h2 className="text-sm sm:text-base font-black text-slate-800">
+          <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 dark:bg-emerald-500 animate-pulse" />
+          <h2 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100">
             برنامه هفتگی کلاس‌ها
           </h2>
-          <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+          <span className="text-[11px] font-bold text-indigo-700 dark:text-emerald-400 bg-indigo-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-emerald-800/50">
             {toPersianDigits(courses.length)} درس
           </span>
         </div>
@@ -116,8 +116,8 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             onClick={onToggleFriday}
             className={`text-xs px-2.5 sm:px-3.5 py-1.5 rounded-xl border font-bold transition-all cursor-pointer ${
               showFriday
-                ? 'bg-indigo-50 text-indigo-700 border-indigo-300 shadow-xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                ? 'bg-indigo-50 dark:bg-emerald-900/30 text-indigo-700 dark:text-emerald-400 border-indigo-300 dark:border-emerald-500/50 shadow-xs'
+                : 'bg-slate-50 dark:bg-[#1c1d21] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#383a40] hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             {showFriday ? '✓ روز جمعه فعال' : '+ افزودن روز جمعه'}
@@ -126,13 +126,13 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       </div>
 
       {/* Main Full-Width Responsive Timetable (No horizontal scroll needed) */}
-      <div className="w-full select-none bg-slate-50/20">
+      <div className="w-full select-none bg-slate-50/20 dark:bg-[#1c1d21]/20">
         
         {/* Top Time Header (Horizontal Axis) */}
-        <div className="flex border-b border-slate-200 bg-slate-100/95 text-xs font-bold text-slate-700 sticky top-0 z-10">
+        <div className="flex border-b border-slate-200 dark:border-[#2a2b30] bg-slate-100/95 dark:bg-[#1c1d21]/95 text-xs font-bold text-slate-700 sticky top-0 z-10">
           
           {/* Days Column Header */}
-          <div className="w-16 sm:w-20 md:w-24 shrink-0 py-2.5 sm:py-3 px-1 text-center border-l border-slate-200 flex items-center justify-center text-slate-700 font-black bg-slate-100 text-[11px] sm:text-xs">
+          <div className="w-16 sm:w-20 md:w-24 shrink-0 py-2.5 sm:py-3 px-1 text-center border-l border-slate-200 dark:border-[#2a2b30] flex items-center justify-center text-slate-700 dark:text-slate-400 font-black bg-slate-100 dark:bg-[#1c1d21] text-[11px] sm:text-xs">
             
           </div>
 
@@ -158,23 +158,23 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                       transform: transformClass,
                     }}
                   >
-                    <span className="hidden sm:inline font-bold text-[10.5px] text-slate-800 bg-slate-100/95 px-1 py-0.5 rounded shadow-2xs">
+                    <span className="hidden sm:inline font-bold text-[10.5px] text-slate-800 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-800/95 px-1 py-0.5 rounded shadow-2xs">
                       {toPersianDigits(fullTimeString)}
                     </span>
-                    <span className="sm:hidden font-bold text-[9px] text-slate-800 bg-slate-100/95 px-0.5 py-0.2 rounded shadow-2xs">
+                    <span className="sm:hidden font-bold text-[9px] text-slate-800 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-800/95 px-0.5 py-0.2 rounded shadow-2xs">
                       {toPersianDigits(shortTimeString)}
                     </span>
                   </div>
 
                   {/* 1-Hour Solid Tick Line in Header */}
                   <div
-                    className="absolute top-0 bottom-0 border-r border-slate-300 sm:border-r-2 pointer-events-none"
+                    className="absolute top-0 bottom-0 border-r border-slate-300 dark:border-[#383a40] sm:border-r-2 pointer-events-none"
                     style={{ right: `${rightPercent}%` }}
                   />
 
                   {/* Half-Hour Dashed Tick Line in Header (No text above) */}
                   <div
-                    className="absolute top-0 bottom-0 border-r border-dashed border-slate-300/80 pointer-events-none"
+                    className="absolute top-0 bottom-0 border-r border-dashed border-slate-300/80 dark:border-[#383a40]/80 pointer-events-none"
                     style={{ right: `${halfHourPercent}%` }}
                   />
                 </React.Fragment>
@@ -184,7 +184,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
         </div>
 
         {/* Days Rows (Vertical Axis) */}
-        <div className="divide-y divide-slate-200">
+        <div className="divide-y divide-slate-200 dark:divide-slate-800">
           {displayedDays.map((day) => {
             // Sessions for this specific day
             const daySessions: { course: Course; session: ClassSession }[] = [];
@@ -197,14 +197,14 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             });
 
             return (
-              <div key={day.id} className="flex min-h-[48px] sm:min-h-[64px] md:min-h-[80px] lg:min-h-[96px] group/row transition-colors hover:bg-slate-50/40">
+              <div key={day.id} className="flex min-h-[48px] sm:min-h-[64px] md:min-h-[80px] lg:min-h-[96px] group/row transition-colors hover:bg-slate-50/40 dark:hover:bg-slate-800/30">
                 
                 {/* Day Label (Right sticky column) */}
-                <div className="w-16 sm:w-20 md:w-24 shrink-0 p-1.5 sm:p-2 border-l border-slate-200 bg-slate-50/80 flex flex-col justify-center items-center text-center">
-                  <span className="font-black text-xs sm:text-sm text-slate-800">
+                <div className="w-16 sm:w-20 md:w-24 shrink-0 p-1.5 sm:p-2 border-l border-slate-200 dark:border-[#2a2b30] bg-slate-50/80 dark:bg-[#1c1d21]/80 flex flex-col justify-center items-center text-center">
+                  <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200">
                     {day.fa}
                   </span>
-                  <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5">
+                  <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                     {daySessions.length > 0
                       ? `${toPersianDigits(daySessions.length)} درس`
                       : '—'}
@@ -213,7 +213,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 
                 {/* Day Timeline Strip (100% fluid) */}
                 <div
-                  className="flex-1 relative cursor-crosshair bg-white overflow-hidden"
+                  className="flex-1 relative cursor-crosshair bg-white dark:bg-[#131416] overflow-hidden"
                   onClick={(e) => {
                     // Click on empty space to add course at this exact slot
                     if ((e.target as HTMLElement).closest('.course-card-item')) {
@@ -248,13 +248,13 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                       <React.Fragment key={hour}>
                         {/* Solid Distinct 1-Hour Grid Line */}
                         <div
-                          className="absolute top-0 bottom-0 border-r border-slate-200 sm:border-r-2 pointer-events-none z-0"
+                          className="absolute top-0 bottom-0 border-r border-slate-200 dark:border-[#2a2b30] sm:border-r-2 pointer-events-none z-0"
                           style={{ right: `${rightPercent}%` }}
                         />
 
                         {/* Faint Dashed 30-Minute Grid Line */}
                         <div
-                          className="absolute top-0 bottom-0 border-r border-dashed border-slate-200/80 pointer-events-none z-0"
+                          className="absolute top-0 bottom-0 border-r border-dashed border-slate-200/80 dark:border-[#2a2b30]/80 pointer-events-none z-0"
                           style={{ right: `${halfHourPercent}%` }}
                         />
                       </React.Fragment>
@@ -337,53 +337,53 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       {/* Floating Modal for Course Card Quick View / Actions */}
       {selectedCourseCard && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
           onClick={() => setSelectedCourseCard(null)}
         >
           <div 
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4"
+            className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-slate-200 dark:border-[#2a2b30] shadow-xl max-w-sm w-full p-5 space-y-4 transition-colors duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[11px] font-extrabold text-indigo-600">مشخصات درس</span>
-                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                <span className="text-[11px] font-extrabold text-indigo-600 dark:text-emerald-500">مشخصات درس</span>
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5">
                   {selectedCourseCard.course.name}
                 </h3>
               </div>
               <button 
                 onClick={() => setSelectedCourseCard(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[#1c1d21]/80 p-3 rounded-xl border border-slate-100 dark:border-[#2a2b30]">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">تعداد واحد:</span>
+                <span className="text-slate-500 dark:text-slate-400">تعداد واحد:</span>
                 <span className="font-bold">{toPersianDigits(selectedCourseCard.course.credits)} واحد</span>
               </div>
               {selectedCourseCard.course.code && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">کد درس:</span>
-                  <span className="font-bold">{selectedCourseCard.course.code}</span>
+                  <span className="text-slate-500 dark:text-slate-400">کد درس:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{selectedCourseCard.course.code}</span>
                 </div>
               )}
               {selectedCourseCard.course.instructor && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">استاد:</span>
-                  <span className="font-bold">{selectedCourseCard.course.instructor}</span>
+                  <span className="text-slate-500 dark:text-slate-400">استاد:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{selectedCourseCard.course.instructor}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">زمان این جلسه:</span>
-                <span className="font-bold">
+                <span className="text-slate-500 dark:text-slate-400">زمان این جلسه:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
                   {getDayFaName(selectedCourseCard.session.day)} {toPersianDigits(selectedCourseCard.session.startTime)} تا {toPersianDigits(selectedCourseCard.session.endTime)}
                 </span>
               </div>
               {selectedCourseCard.course.exam?.date && (
-                <div className="flex items-center justify-between text-indigo-700 font-bold pt-1 border-t border-slate-200">
+                <div className="flex items-center justify-between text-indigo-700 dark:text-emerald-400 font-bold pt-1 border-t border-slate-200 dark:border-[#383a40]/50">
                   <span>تاریخ آزمون پایان ترم:</span>
                   <span>
                     {formatExamDate(selectedCourseCard.course.exam.date)} (ساعت {toPersianDigits(selectedCourseCard.course.exam.startTime)})
@@ -392,7 +392,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#2a2b30]">
               <button
                 type="button"
                 onClick={() => {
@@ -402,7 +402,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                     onDeleteCourse(c.id);
                   }
                 }}
-                className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 حذف درس
@@ -415,7 +415,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                   setSelectedCourseCard(null);
                   onEditCourse(c);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                className="px-4 py-2 text-xs font-bold text-white dark:text-black bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] rounded-xl transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
               >
                 <Edit className="w-3.5 h-3.5" />
                 ویرایش کامل
