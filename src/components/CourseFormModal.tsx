@@ -74,6 +74,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   const [examStartTime, setExamStartTime] = useState('08:30');
   const [examEndTime, setExamEndTime] = useState('10:30');
   const [examNotes, setExamNotes] = useState('');
+  const [hasExam, setHasExam] = useState(true);
 
   // Active sub-tab in modal
   const [activeTab, setActiveTab] = useState<'details' | 'sessions' | 'exam'>('details');
@@ -95,6 +96,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         );
 
         if (initialCourse.exam) {
+          setHasExam(true);
           const parts = (initialCourse.exam.date || '').split('/');
           if (parts.length === 3) {
             setExamYear(parts[0]);
@@ -104,6 +106,8 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
           setExamStartTime(initialCourse.exam.startTime || '08:30');
           setExamEndTime(initialCourse.exam.endTime || '10:30');
           setExamNotes(initialCourse.exam.notes || '');
+        } else {
+          setHasExam(false);
         }
       } else {
         // New Course
@@ -114,6 +118,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         const randomColor = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)].id;
         setColor(randomColor);
         setNotes('');
+        setHasExam(true);
 
         if (prefilledSlot) {
           setSessions([
@@ -155,13 +160,16 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   }, [isOpen, initialCourse, prefilledSlot]);
 
   // Construct current exam object
-  const currentExamInfo: ExamInfo = useMemo(() => ({
-    date: `${examYear}/${examMonth.padStart(2, '0')}/${examDay.padStart(2, '0')}`,
-    dateType: 'shamsi',
-    startTime: examStartTime,
-    endTime: examEndTime,
-    notes: examNotes,
-  }), [examYear, examMonth, examDay, examStartTime, examEndTime, examNotes]);
+  const currentExamInfo: ExamInfo | undefined = useMemo(() => {
+    if (!hasExam) return undefined;
+    return {
+      date: `${examYear}/${examMonth.padStart(2, '0')}/${examDay.padStart(2, '0')}`,
+      dateType: 'shamsi',
+      startTime: examStartTime,
+      endTime: examEndTime,
+      notes: examNotes,
+    };
+  }, [hasExam, examYear, examMonth, examDay, examStartTime, examEndTime, examNotes]);
 
   // Real-time conflict validation
   const validationResult = useMemo(() => {
@@ -549,8 +557,22 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
           {activeTab === 'exam' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               
+              {/* No Exam Checkbox */}
+              <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-[#131416] rounded-xl border border-slate-200 dark:border-[#2a2b30] cursor-pointer hover:bg-slate-100 dark:hover:bg-[#1c1d21] transition-colors">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={!hasExam}
+                    onChange={(e) => setHasExam(!e.target.checked)}
+                    className="w-5 h-5 appearance-none border-2 border-slate-300 dark:border-[#383a40] rounded bg-white dark:bg-[#1c1d21] checked:bg-indigo-600 dark:checked:bg-emerald-500 checked:border-indigo-600 dark:checked:border-emerald-500 transition-colors cursor-pointer"
+                  />
+                  <CheckCircle2 className={`absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 transition-opacity ${!hasExam ? 'opacity-100' : ''}`} style={{ left: '3px', top: '3px' }} />
+                </div>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">این درس امتحان پایان ترم ندارد</span>
+              </label>
+
               {/* Date Picker */}
-              <div className="space-y-2">
+              <div className={`space-y-2 transition-opacity duration-200 ${!hasExam ? 'opacity-40 pointer-events-none' : ''}`}>
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">
                   تاریخ امتحان پایان ترم:
                 </label>
@@ -576,7 +598,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               </div>
 
               {/* Exam Time */}
-              <div className="bg-slate-50 dark:bg-[#1c1d21]/50 p-4 rounded-xl border border-slate-200 dark:border-[#2a2b30] space-y-3">
+              <div className={`bg-slate-50 dark:bg-[#1c1d21]/50 p-4 rounded-xl border border-slate-200 dark:border-[#2a2b30] space-y-3 transition-opacity duration-200 ${!hasExam ? 'opacity-40 pointer-events-none' : ''}`}>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-indigo-600 dark:text-emerald-500" />
                   ساعت برگزاری امتحان:
@@ -612,7 +634,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               </div>
 
               {/* Exam Notes */}
-              <div>
+              <div className={`transition-opacity duration-200 ${!hasExam ? 'opacity-40 pointer-events-none' : ''}`}>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   یادداشت امتحان (اختیاری):
                 </label>

@@ -30,7 +30,7 @@ export interface Course {
   credits: number;     // e.g. 3
   color: string;       // Hex or Tailwind color class key
   sessions: ClassSession[];
-  exam: ExamInfo;
+  exam?: ExamInfo;
   notes?: string;
   createdAt: number;
 }

@@ -176,12 +176,12 @@ export function getCourseTheme(colorId: string) {
 
 // Get all conflicts (class + exam)
 export function validateCourse(
-  candidate: { sessions: ClassSession[]; exam: ExamInfo },
+  candidate: { sessions: ClassSession[]; exam?: ExamInfo },
   existingCourses: Course[],
   excludeCourseId?: string
 ): { hasConflict: boolean; conflicts: ScheduleConflict[] } {
   const classConflicts = findClassConflicts(candidate.sessions, existingCourses, excludeCourseId);
-  const examConflicts = findExamConflicts(candidate.exam, existingCourses, excludeCourseId);
+  const examConflicts = candidate.exam ? findExamConflicts(candidate.exam, existingCourses, excludeCourseId) : [];
   const all = [...classConflicts, ...examConflicts];
 
   return {

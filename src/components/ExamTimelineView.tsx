@@ -14,33 +14,36 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
   onEditCourse,
   onOpenAddModal,
 }) => {
-  // Sort courses by exam date and start time
+  // Filter and sort courses by exam date and start time
   const sortedExams = useMemo(() => {
-    return [...courses].sort((a, b) => {
-      const dateA = a.exam?.date || '9999/99/99';
-      const dateB = b.exam?.date || '9999/99/99';
-      if (dateA !== dateB) {
-        return dateA.localeCompare(dateB);
-      }
-      return (a.exam?.startTime || '00:00').localeCompare(b.exam?.startTime || '00:00');
-    });
+    return courses
+      .filter((course) => !!course.exam)
+      .sort((a, b) => {
+        const dateA = a.exam!.date;
+        const dateB = b.exam!.date;
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
+        }
+        return a.exam!.startTime.localeCompare(b.exam!.startTime);
+      });
   }, [courses]);
 
   // Check for any exam conflicts across the entire course list
   const examConflicts = useMemo(() => {
     const list: { courseA: Course; courseB: Course; date: string; time: string }[] = [];
-    for (let i = 0; i < courses.length; i++) {
-      for (let j = i + 1; j < courses.length; j++) {
-        const c1 = courses[i];
-        const c2 = courses[j];
-        if (c1.exam?.date && c2.exam?.date && c1.exam.date === c2.exam.date) {
-          const conflicts = findExamConflicts(c1.exam, [c2]);
+    const examCourses = courses.filter((c) => !!c.exam);
+    for (let i = 0; i < examCourses.length; i++) {
+      for (let j = i + 1; j < examCourses.length; j++) {
+        const c1 = examCourses[i];
+        const c2 = examCourses[j];
+        if (c1.exam!.date === c2.exam!.date) {
+          const conflicts = findExamConflicts(c1.exam!, [c2]);
           if (conflicts.length > 0) {
             list.push({
               courseA: c1,
               courseB: c2,
-              date: c1.exam.date,
-              time: `${c1.exam.startTime} تا ${c1.exam.endTime}`,
+              date: c1.exam!.date,
+              time: `${c1.exam!.startTime} تا ${c1.exam!.endTime}`,
             });
           }
         }
