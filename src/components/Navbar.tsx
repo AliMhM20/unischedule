@@ -33,11 +33,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200">
-      <div className="w-full px-6 h-15 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="w-full px-3 xs:px-4 sm:px-6 h-15 flex items-center justify-between gap-1 xs:gap-2 sm:gap-4 overflow-hidden">
         
         {/* ZONE 1: BRAND TITLE (Never wraps, scales smoothly) */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="font-black text-sm sm:text-base md:text-lg tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap">
+        <div className="flex items-center min-w-0 shrink">
+          <span className="font-black text-[11px] min-[380px]:text-xs sm:text-sm md:text-base lg:text-lg tracking-tight text-slate-900 dark:text-slate-100 truncate">
             برنامه‌ریز انتخاب واحد دانشگاه
           </span>
         </div>
@@ -74,8 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* ZONE 3: ACTIONS (Plan selector, Print, Add Course) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           
-          {/* Plan / Scenario Switcher */}
-          <div className="relative flex items-center bg-slate-100 dark:bg-[#1c1d21] rounded-xl p-0.5 border border-slate-200 dark:border-[#2a2b30] max-w-[125px] xs:max-w-[155px] sm:max-w-[210px]">
+          {/* Plan / Scenario Switcher (Desktop only) */}
+          <div className="hidden sm:flex relative items-center bg-slate-100 dark:bg-[#1c1d21] rounded-xl p-0.5 border border-slate-200 dark:border-[#2a2b30] sm:max-w-[210px] shrink-0">
             <span className="hidden xs:flex text-[11px] font-bold text-slate-500 dark:text-slate-400 pr-2 pl-1 items-center gap-1 shrink-0">
               <Layers className="w-3 h-3 text-slate-400 dark:text-slate-500" />
               سناریو:
@@ -133,6 +133,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         </div>
 
+      </div>
+
+      {/* Mobile Plan Switcher (Visible only on very small screens < sm) */}
+      <div className="sm:hidden flex justify-center w-full px-3 pb-2.5">
+        <div className="relative flex items-center bg-slate-100 dark:bg-[#1c1d21] rounded-xl p-1 border border-slate-200 dark:border-[#2a2b30] w-full max-w-xs shrink-0">
+          <span className="flex text-[11px] font-bold text-slate-500 dark:text-slate-400 pr-2 pl-1 items-center gap-1 shrink-0">
+            <Layers className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+            سناریو:
+          </span>
+          <select
+            value={activePlanId}
+            onChange={(e) => {
+              if (e.target.value === '__add_new__') {
+                onAddPlan();
+              } else {
+                onSelectPlan(e.target.value);
+              }
+            }}
+            className="bg-transparent text-[13px] font-bold text-slate-800 dark:text-slate-200 px-1 py-1 focus:outline-none cursor-pointer truncate w-full"
+          >
+            {plans.map((p) => (
+              <option key={p.id} value={p.id} className="dark:bg-[#1c1d21] dark:text-slate-200">
+                {p.name} ({toPersianDigits(p.courses.length)} درس)
+              </option>
+            ))}
+            <option value="__add_new__" className="dark:bg-[#1c1d21] dark:text-[#00B87C]">+ سناریوی جدید</option>
+          </select>
+        </div>
       </div>
 
       {/* Sub-Nav Tab Bar for screens below lg breakpoint */}
