@@ -10,7 +10,6 @@ interface NavbarProps {
   activeTab: 'grid' | 'help';
   setActiveTab: (tab: 'grid' | 'help') => void;
   onOpenAddModal: () => void;
-  onOpenCatalogModal: () => void;
   plans: SchedulePlan[];
   activePlanId: string;
   onSelectPlan: (planId: string) => void;
@@ -24,7 +23,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onOpenAddModal,
-  onOpenCatalogModal,
   plans,
   activePlanId,
   onSelectPlan,
@@ -120,18 +118,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0"
           >
             <Printer className="w-4 h-4" />
-          </button>
-
-          {/* Catalog / Auto Import Button */}
-          <button
-            type="button"
-            onClick={onOpenCatalogModal}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-xl text-[11px] sm:text-xs font-bold transition-all shadow-xs hover:shadow-md active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="hidden sm:inline">بانک دروس (گزارش ۲۱۲)</span>
-            <span className="sm:hidden">وارد کردن</span>
-            <span className="bg-white/20 text-white text-[9px] px-1.5 py-0.5 rounded-md leading-none ml-1">BETA</span>
           </button>
 
           {/* Primary Action Button */}

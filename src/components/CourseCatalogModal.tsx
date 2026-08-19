@@ -4,6 +4,11 @@ import { X, Upload, FileText, Search, Filter, BookOpen, AlertCircle, CheckCircle
 import { parseBehestanHtml } from '../utils/htmlCourseParser';
 import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme } from '../utils/timeUtils';
 
+import image1 from '../../assets/Help Photos/image1.png';
+import image2 from '../../assets/Help Photos/image2.png';
+import image3 from '../../assets/Help Photos/image3.png';
+import image4 from '../../assets/Help Photos/image4.png';
+
 interface CourseCatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,6 +33,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   setStudentInfo
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [showUploadView, setShowUploadView] = useState(false);
   const [htmlInput, setHtmlInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   
@@ -50,6 +56,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       setCatalogCourses(courses);
       setStudentInfo({ name: studentName, id: studentId });
       setError(null);
+      setShowUploadView(false);
     } catch (err) {
       setError('خطا در پردازش فایل. لطفاً فایل معتبری انتخاب کنید.');
       console.error(err);
@@ -125,7 +132,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0b0c0e]">
           
-          {!hasCatalog ? (
+          {!hasCatalog || showUploadView ? (
             /* ================= STATE 1: UPLOAD & IMPORT ================= */
             <div className="p-6 sm:p-10 max-w-2xl mx-auto space-y-8">
               
@@ -135,6 +142,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   فایل HTML گزارش ۲۱۲ (نمایش جدولی) را از پرتال آموزشی دریافت کرده و در اینجا بارگذاری کنید.
                 </p>
               </div>
+
+              {hasCatalog && (
+                <button
+                  onClick={() => setShowUploadView(false)}
+                  className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors"
+                >
+                  بازگشت به لیست دروس (انصراف)
+                </button>
+              )}
 
               {error && (
                 <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 p-4 rounded-2xl text-sm font-bold flex items-start gap-2 border border-rose-100 dark:border-rose-900/30">
@@ -184,19 +200,63 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
               </div>
 
               {/* Guide */}
-              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-5 text-sm">
-                <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4" />
-                  راهنمای دریافت فایل:
-                </h4>
-                <ol className="list-decimal list-inside text-blue-700 dark:text-blue-400 space-y-1.5 leading-relaxed text-xs sm:text-sm">
-                  <li>وارد پرتال آموزشی بهستان شوید.</li>
-                  <li>به منوی <strong>گزارش‌های آموزشی</strong> &gt; <strong>گزارش ۲۱۲ (لیست دروس ارائه شده)</strong> بروید.</li>
-                  <li>پس از جستجوی دروس مورد نظر، روی دکمه <strong>نمایش جدولی</strong> کلیک کنید تا جدول دروس باز شود.</li>
-                  <li>در صفحه باز شده، کلیدهای <code>Ctrl + S</code> را بزنید تا صفحه ذخیره شود.</li>
-                  <li>در پنجره ذخیره، فرمت <strong>Webpage, Complete</strong> یا <strong>HTML Only</strong> را انتخاب و فایل را ذخیره کنید.</li>
-                  <li>آن فایل را در این قسمت بارگذاری کنید.</li>
-                </ol>
+              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl overflow-hidden text-sm transition-all">
+                <details className="group">
+                  <summary className="font-bold text-blue-800 dark:text-blue-300 p-5 cursor-pointer flex items-center justify-between list-none [&::-webkit-details-marker]:hidden">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 shrink-0" />
+                      راهنمای تصویری دریافت فایل از کامپیوتر شخصی
+                    </div>
+                    <div className="text-blue-500 group-open:rotate-180 transition-transform shrink-0">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </div>
+                  </summary>
+                  <div className="px-5 pb-5 pt-0 border-t border-blue-100/50 dark:border-blue-900/30 mt-1">
+                    <div className="space-y-8 text-blue-800 dark:text-blue-200 text-xs sm:text-sm mt-5">
+                      
+                      {/* Step 1 & 2 */}
+                      <div className="space-y-3">
+                        <p className="leading-relaxed font-medium">۱. وارد <strong>پرتال آموزشی بهستان</strong> شوید.</p>
+                        <p className="leading-relaxed font-medium">۲. در قسمت جست و جو، کد <strong>212</strong> را وارد کنید و <strong>enter</strong> بزنید.</p>
+                        <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 max-w-lg shadow-sm">
+                          <img src={image1} alt="جستجوی فرم ۲۱۲" className="w-full h-auto" />
+                        </div>
+                      </div>
+
+                      {/* Step 3 */}
+                      <div className="space-y-3">
+                        <p className="leading-relaxed font-medium">۳. در پنجره جدید لیست دروس خود را مشاهده میکنید. پایین لیست روی دکمه <strong>"نمایش جدولی"</strong> کلیک کنید.</p>
+                        <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 max-w-lg shadow-sm">
+                          <img src={image2} alt="دکمه نمایش جدولی" className="w-full h-auto" />
+                        </div>
+                      </div>
+
+                      {/* Step 4 */}
+                      <div className="space-y-3">
+                        <p className="leading-relaxed font-medium">۴. روی صفحه جدید باز شده راست کلیک کنید و گزینه <strong>"inspect"</strong> را انتخاب کنید.</p>
+                        <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 max-w-lg shadow-sm">
+                          <img src={image3} alt="راست کلیک و Inspect" className="w-full h-auto" />
+                        </div>
+                      </div>
+
+                      {/* Step 5 */}
+                      <div className="space-y-3">
+                        <p className="leading-relaxed font-medium">۵. در صفحه جدید کد html ای مشاهده میکنید. روی خط اول کد ( <strong>&lt;html&gt;</strong> ) راست کلیک کنید و در قسمت <strong>Copy</strong>، روی <strong>Copy outerHTML</strong> کلیک کنید.</p>
+                        <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 max-w-lg shadow-sm">
+                          <img src={image4} alt="کپی کردن کد HTML" className="w-full h-auto" />
+                        </div>
+                      </div>
+
+                      {/* Step 6 */}
+                      <div className="bg-blue-100/60 dark:bg-blue-800/40 p-4 sm:p-5 rounded-xl border border-blue-200 dark:border-blue-700/50 mt-6">
+                        <p className="leading-relaxed font-medium">
+                          ۶. کد html درون کلیپ بورد شما کپی شده. میتوانید کد را مستقیما درون <strong>قسمت مشخص شده paste کنید</strong> و یا میتوانید درون کامپیوتر خود فایل تکست ساخته و محتوای کد را درون آن <strong>paste</strong> کرده و در آخر فایل را با پسوند <strong>html.</strong> ذخیره کنید و فایل ساخته شده را در قسمت مشخص شده آپلود کنید.
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+                </details>
               </div>
 
             </div>
@@ -223,7 +283,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   </div>
                   
                   <button
-                    onClick={handleReset}
+                    onClick={() => setShowUploadView(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-[#1c1d21] hover:bg-slate-200 dark:hover:bg-[#2a2b30] rounded-xl transition-colors shrink-0"
                   >
                     <Upload className="w-3.5 h-3.5" />

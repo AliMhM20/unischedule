@@ -9,7 +9,7 @@ import { CourseCatalogModal } from './components/CourseCatalogModal';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
 const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
@@ -220,7 +220,6 @@ export default function App() {
           setPrefilledSlot(null);
           setIsFormModalOpen(true);
         }}
-        onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
         plans={plans}
         activePlanId={activePlan.id}
         onSelectPlan={(id) => setActivePlanId(id)}
@@ -237,6 +236,31 @@ export default function App() {
         {activeTab === 'grid' && (
           <div className="w-full space-y-6">
             
+            {/* Catalog Banner */}
+            <button
+              onClick={() => setIsCatalogModalOpen(true)}
+              className="w-full relative overflow-hidden bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md hover:shadow-lg active:scale-[0.99] group text-right"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+              <div className="absolute bottom-0 left-0 w-40 h-40 bg-black opacity-10 rounded-full -ml-10 -mb-10 blur-3xl"></div>
+              
+              <div className="relative flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                  <BookOpen className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black flex items-center gap-2">
+                    بانک دروس دانشگاه (گزارش ۲۱۲)
+                    <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md leading-none font-bold">BETA</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-purple-100 mt-1 opacity-90">دروس خود را با یک کلیک از سامانه بهستان وارد کرده و از تداخل‌های کلاسی و امتحانی جلوگیری کنید.</p>
+                </div>
+              </div>
+              <div className="relative shrink-0 w-full sm:w-auto bg-white/20 hover:bg-white/30 px-6 py-2.5 rounded-xl font-bold text-sm text-center transition-colors">
+                ورود به بانک دروس
+              </div>
+            </button>
+
             {/* 1. Courses & Units Summary Panel (On Top) */}
             <div className="w-full">
               <CourseListSidebar
