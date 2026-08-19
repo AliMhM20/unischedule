@@ -5,6 +5,7 @@ import { CourseListSidebar } from './components/CourseListSidebar';
 import { ExamTimelineView } from './components/ExamTimelineView';
 import { HelpAndRules } from './components/HelpAndRules';
 import { CourseFormModal } from './components/CourseFormModal';
+import { CourseCatalogModal } from './components/CourseCatalogModal';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
@@ -12,11 +13,31 @@ import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
 const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
+const CATALOG_STORAGE_KEY = 'unischedule_catalog_courses';
+const STUDENT_INFO_KEY = 'unischedule_student_info';
 
 export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'grid' | 'help'>('grid');
   const [showFriday, setShowFriday] = useState<boolean>(false);
+
+  // Catalog State
+  const [catalogCourses, setCatalogCourses] = useState<Course[]>(() => {
+    try {
+      const saved = localStorage.getItem(CATALOG_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [studentInfo, setStudentInfo] = useState<{ name?: string; id?: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem(STUDENT_INFO_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
   // Plans state - Defaults to empty schedule for new users
   const [plans, setPlans] = useState<SchedulePlan[]>(() => {
@@ -90,6 +111,7 @@ export default function App() {
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [prefilledSlot, setPrefilledSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
 
@@ -108,10 +130,12 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
       localStorage.setItem(ACTIVE_PLAN_KEY, activePlanId);
+      localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(catalogCourses));
+      localStorage.setItem(STUDENT_INFO_KEY, JSON.stringify(studentInfo));
     } catch (e) {
       console.error('Failed to save to localStorage', e);
     }
-  }, [plans, activePlanId]);
+  }, [plans, activePlanId, catalogCourses, studentInfo]);
 
   // Handler: Save (Add or Update) Course
   const handleSaveCourse = (course: Course) => {
@@ -196,6 +220,7 @@ export default function App() {
           setPrefilledSlot(null);
           setIsFormModalOpen(true);
         }}
+        onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
         plans={plans}
         activePlanId={activePlan.id}
         onSelectPlan={(id) => setActivePlanId(id)}
@@ -288,6 +313,21 @@ export default function App() {
           initialCourse={editingCourse}
           prefilledSlot={prefilledSlot}
           existingCourses={activePlan.courses}
+        />
+      )}
+
+      {/* Course Catalog Modal (Behestan Import) */}
+      {isCatalogModalOpen && (
+        <CourseCatalogModal
+          isOpen={isCatalogModalOpen}
+          onClose={() => setIsCatalogModalOpen(false)}
+          onAddCourse={handleSaveCourse}
+          onRemoveCourse={handleDeleteCourse}
+          existingCourses={activePlan.courses}
+          catalogCourses={catalogCourses}
+          setCatalogCourses={setCatalogCourses}
+          studentInfo={studentInfo}
+          setStudentInfo={setStudentInfo}
         />
       )}
 
