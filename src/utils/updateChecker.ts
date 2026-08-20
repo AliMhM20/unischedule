@@ -1,4 +1,4 @@
-export const CURRENT_APP_VERSION = '1.1.7';
+export const CURRENT_APP_VERSION = '1.2.7';
 
 export interface UpdateInfo {
   status: 'checking' | 'update_available' | 'up_to_date' | 'no_internet' | 'error';
@@ -11,11 +11,11 @@ export interface UpdateInfo {
 }
 
 /**
- * Compare two semver strings (e.g., "1.2.0" vs "1.1.7").
+ * Compare two semver strings (e.g., "1.2.7" vs "1.1.7").
  * Returns:
- *  1 if v1 > v2
- * -1 if v1 < v2
- *  0 if v1 === v2
+ *  1 if v1 > v2 (v1 is strictly newer than v2)
+ * -1 if v1 < v2 (v1 is older than v2)
+ *  0 if v1 === v2 (equal)
  */
 export function compareVersions(v1: string, v2: string): number {
   const cleanV1 = v1.replace(/^v/i, '').trim();
@@ -39,12 +39,14 @@ export function compareVersions(v1: string, v2: string): number {
 /**
  * Check GitHub repository for the latest release or version
  */
-export async function checkForAppUpdates(): Promise<UpdateInfo> {
+export async function checkForAppUpdates(customLocalVersion?: string): Promise<UpdateInfo> {
+  const localVersion = customLocalVersion || CURRENT_APP_VERSION;
+
   // 1. Check browser/system online status
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return {
       status: 'no_internet',
-      currentVersion: CURRENT_APP_VERSION,
+      currentVersion: localVersion,
       errorMessage: 'اتصال اینترنت شما قطع است. لطفاً وضعیت شبکه خود را بررسی کنید.',
     };
   }
@@ -63,7 +65,6 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
       const latestTag: string = data.tag_name || data.name || '';
       const latestVersion = latestTag.replace(/^v/i, '').trim();
       
-      // Find direct .exe asset download URL if available, else use release HTML URL
       let downloadUrl = data.html_url || 'https://github.com/AliMhM20/unischedule/releases/latest';
       if (Array.isArray(data.assets) && data.assets.length > 0) {
         const exeAsset = data.assets.find((asset: { name?: string; browser_download_url?: string }) => 
@@ -74,27 +75,29 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
         }
       }
 
-      const isNewer = compareVersions(latestVersion, CURRENT_APP_VERSION) > 0;
+      // ONLY if latest release on GitHub is strictly NEWER than local version
+      const isNewer = compareVersions(latestVersion, localVersion) > 0;
 
       if (isNewer) {
         return {
           status: 'update_available',
-          currentVersion: CURRENT_APP_VERSION,
+          currentVersion: localVersion,
           latestVersion,
           releaseNotes: data.body || 'به‌روزرسانی جدید شامل بهبود عملکرد و رفع اشکالات.',
           downloadUrl,
           publishedAt: data.published_at ? new Date(data.published_at).toLocaleDateString('fa-IR') : undefined,
         };
       } else {
+        // If local is equal or even newer (e.g. 1.2.7 vs 1.1.7), it is up to date!
         return {
           status: 'up_to_date',
-          currentVersion: CURRENT_APP_VERSION,
+          currentVersion: localVersion,
           latestVersion,
         };
       }
     }
 
-    // 3. Fallback: Check package.json on main branch directly if API fails (e.g. rate limit)
+    // 3. Fallback: Check package.json on main branch directly
     const rawPkgResponse = await fetch('https://raw.githubusercontent.com/AliMhM20/unischedule/main/package.json', {
       cache: 'no-store',
     });
@@ -102,12 +105,12 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
     if (rawPkgResponse.ok) {
       const pkg = await rawPkgResponse.json();
       const latestVersion = (pkg.version || '').trim();
-      const isNewer = compareVersions(latestVersion, CURRENT_APP_VERSION) > 0;
+      const isNewer = compareVersions(latestVersion, localVersion) > 0;
 
       if (isNewer) {
         return {
           status: 'update_available',
-          currentVersion: CURRENT_APP_VERSION,
+          currentVersion: localVersion,
           latestVersion,
           releaseNotes: 'نسخه جدید در دسترس است.',
           downloadUrl: 'https://github.com/AliMhM20/unischedule/releases/latest',
@@ -115,7 +118,7 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
       } else {
         return {
           status: 'up_to_date',
-          currentVersion: CURRENT_APP_VERSION,
+          currentVersion: localVersion,
           latestVersion,
         };
       }
@@ -124,18 +127,17 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
     throw new Error(`پاسخ ناموفق از سرور (کد وضعیت: ${response.status})`);
   } catch (err: unknown) {
     const error = err as Error;
-    // Check if network failed
     if (!navigator.onLine || error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
       return {
         status: 'no_internet',
-        currentVersion: CURRENT_APP_VERSION,
+        currentVersion: localVersion,
         errorMessage: 'امکان برقراری ارتباط با سرور وجود ندارد. ممکن است اینترنت قطع باشد یا دسترسی مسدود شده باشد.',
       };
     }
 
     return {
       status: 'error',
-      currentVersion: CURRENT_APP_VERSION,
+      currentVersion: localVersion,
       errorMessage: error.message || 'خطای ناشناخته در بررسی به‌روزرسانی رخ داد.',
     };
   }

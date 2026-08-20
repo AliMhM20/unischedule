@@ -1,11 +1,80 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
+
+// Configure autoUpdater for differential updates
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+autoUpdater.allowDowngrade = false;
 
 // IPC Handlers
 ipcMain.handle('get-app-version', () => app.getVersion());
+
 ipcMain.handle('open-external', async (_, url) => {
   if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
     await shell.openExternal(url);
+  }
+});
+
+let mainWindow = null;
+
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) {
+    return { isDev: true, currentVersion: app.getVersion() };
+  }
+  try {
+    const checkResult = await autoUpdater.checkForUpdates();
+    return {
+      success: true,
+      updateInfo: checkResult?.updateInfo || null,
+      currentVersion: app.getVersion(),
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      currentVersion: app.getVersion(),
+    };
+  }
+});
+
+ipcMain.handle('start-download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// AutoUpdater Event Listeners -> Forward to renderer
+autoUpdater.on('download-progress', (progressObj) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater-download-progress', {
+      percent: progressObj.percent || 0,
+      bytesPerSecond: progressObj.bytesPerSecond || 0,
+      transferred: progressObj.transferred || 0,
+      total: progressObj.total || 0,
+    });
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater-downloaded', {
+      version: info?.version,
+      releaseNotes: info?.releaseNotes,
+    });
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater-error', err?.message || 'خطا در دانلود به‌روزرسانی');
   }
 });
 
@@ -19,7 +88,7 @@ try {
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 960,

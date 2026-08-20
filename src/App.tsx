@@ -132,7 +132,8 @@ export default function App() {
     setIsUpdateModalOpen(true);
     setIsCheckingUpdate(true);
     try {
-      const info = await checkForAppUpdates();
+      const currentVer = (await window.electronAPI?.getVersion?.()) || CURRENT_APP_VERSION;
+      const info = await checkForAppUpdates(currentVer);
       setUpdateInfo(info);
     } catch (e) {
       setUpdateInfo({

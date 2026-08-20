@@ -1,7 +1,7 @@
 {
   "name": "unischedule",
   "private": true,
-  "version": "1.1.7",
+  "version": "1.2.7",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -16,6 +16,13 @@
   "build": {
     "appId": "com.unischedule.app",
     "productName": "UniSchedule",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AliMhM20",
+        "repo": "unischedule"
+      }
+    ],
     "directories": {
       "output": "release"
     },
@@ -56,6 +63,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
