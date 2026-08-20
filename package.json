@@ -11,7 +11,7 @@
     "clean": "rm -rf dist release server.js",
     "lint": "tsc --noEmit",
     "electron:dev": "concurrently -k \"vite --port=3000\" \"wait-on tcp:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 NODE_ENV=development electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build --base=./ && electron-builder"
   },
   "build": {
     "appId": "com.unischedule.app",
