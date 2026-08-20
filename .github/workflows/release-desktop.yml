@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'نسخه مورد نظر برای انتشار (مثال: 1.1.7)'
+        description: 'نسخه مورد نظر برای انتشار (مثال: 1.2.8)'
         required: false
-        default: '1.1.7'
+        default: '1.2.8'
 
 permissions:
   contents: write
@@ -41,74 +41,8 @@ jobs:
           echo "version=$CLEAN_VER" >> $GITHUB_OUTPUT
           echo "Building UniSchedule Version: $CLEAN_VER"
 
-      - name: Self-Healing (Patch Desktop & Electron Configs)
-        shell: bash
-        run: |
-          node -e "
-          const fs = require('fs');
-          const path = require('path');
-          
-          console.log('--- Self-Healing: Injected Electron & Desktop Configuration ---');
-          const targetVer = '${{ steps.get_version.outputs.version }}';
-          
-          // 1. Patch package.json
-          const pkgPath = path.resolve('package.json');
-          let pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : {};
-          
-          pkg.name = 'unischedule';
-          pkg.productName = 'UniSchedule';
-          pkg.version = targetVer || pkg.version || '1.1.7';
-          pkg.main = 'electron/main.cjs';
-          pkg.scripts = pkg.scripts || {};
-          pkg.scripts['electron:build'] = 'vite build && electron-builder';
-          
-          pkg.build = {
-            appId: 'com.unischedule.app',
-            productName: 'UniSchedule',
-            directories: { output: 'release' },
-            files: ['dist/**/*', 'electron/**/*', 'build/**/*', 'package.json'],
-            win: {
-              icon: 'build/icon.ico',
-              target: [{ target: 'nsis', arch: ['x64'] }, { target: 'portable', arch: ['x64'] }]
-            },
-            nsis: {
-              oneClick: false,
-              allowToChangeInstallationDirectory: true,
-              createDesktopShortcut: true,
-              createStartMenuShortcut: true,
-              shortcutName: 'UniSchedule',
-              include: 'build/installer.nsh'
-            }
-          };
-          
-          pkg.devDependencies = pkg.devDependencies || {};
-          pkg.devDependencies['electron'] = pkg.devDependencies['electron'] || '^43.4.0';
-          pkg.devDependencies['electron-builder'] = pkg.devDependencies['electron-builder'] || '^26.15.3';
-          pkg.devDependencies['cross-env'] = pkg.devDependencies['cross-env'] || '^10.1.0';
-          pkg.devDependencies['concurrently'] = pkg.devDependencies['concurrently'] || '^10.0.5';
-          pkg.devDependencies['wait-on'] = pkg.devDependencies['wait-on'] || '^9.1.0';
-          pkg.devDependencies['@rollup/rollup-win32-x64-msvc'] = '^4.34.8';
-          
-          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-          console.log('✓ Successfully patched package.json for version ' + pkg.version);
-          
-          // 2. Patch vite.config.ts for base ./
-          const vitePath = path.resolve('vite.config.ts');
-          if (fs.existsSync(vitePath)) {
-            let viteContent = fs.readFileSync(vitePath, 'utf8');
-            if (!viteContent.includes('base:')) {
-              viteContent = viteContent.replace(/return\s*\{/, "return {\\n    base: './',");
-              fs.writeFileSync(vitePath, viteContent, 'utf8');
-              console.log('✓ Injected base: ./ into vite.config.ts');
-            }
-          }
-          "
-
-      - name: Clean Lockfile & Install Dependencies
-        shell: bash
-        run: |
-          rm -f package-lock.json
-          npm install --no-audit
+      - name: Install Dependencies
+        run: npm install
 
       - name: Build Application & Electron Binaries
         run: npm run electron:build
