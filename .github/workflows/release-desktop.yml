@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js Environment
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Determine Version
@@ -87,6 +87,7 @@ jobs:
           pkg.devDependencies['cross-env'] = pkg.devDependencies['cross-env'] || '^10.1.0';
           pkg.devDependencies['concurrently'] = pkg.devDependencies['concurrently'] || '^10.0.5';
           pkg.devDependencies['wait-on'] = pkg.devDependencies['wait-on'] || '^9.1.0';
+          pkg.devDependencies['@rollup/rollup-win32-x64-msvc'] = '^4.34.8';
           
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
           console.log('✓ Successfully patched package.json for version ' + pkg.version);
@@ -103,8 +104,11 @@ jobs:
           }
           "
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Clean Lockfile & Install Dependencies
+        shell: bash
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit
 
       - name: Build Application & Electron Binaries
         run: npm run electron:build
