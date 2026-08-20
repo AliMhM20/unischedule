@@ -24,3 +24,11 @@ declare module '*.ico' {
   const src: string;
   export default src;
 }
+
+interface Window {
+  electronAPI?: {
+    isElectron: boolean;
+    getVersion: () => Promise<string>;
+    openExternal: (url: string) => Promise<void>;
+  };
+}

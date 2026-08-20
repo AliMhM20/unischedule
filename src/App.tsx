@@ -6,16 +6,24 @@ import { ExamTimelineView } from './components/ExamTimelineView';
 import { HelpAndRules } from './components/HelpAndRules';
 import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
+import { UpdateModal } from './components/UpdateModal';
 import { Footer } from './components/Footer';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
+import { checkForAppUpdates, UpdateInfo, CURRENT_APP_VERSION } from './utils/updateChecker';
 import { CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
 const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
 const CATALOG_STORAGE_KEY = 'unischedule_catalog_courses';
 const STUDENT_INFO_KEY = 'unischedule_student_info';
+
+// Check if running inside Electron desktop app
+const isElectron = typeof window !== 'undefined' && (
+  Boolean(window.electronAPI?.isElectron) ||
+  window.navigator.userAgent.toLowerCase().includes('electron')
+);
 
 export default function App() {
   // Navigation
@@ -113,8 +121,29 @@ export default function App() {
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [prefilledSlot, setPrefilledSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
+
+  // Check for updates handler
+  const handleCheckForUpdates = async () => {
+    setIsUpdateModalOpen(true);
+    setIsCheckingUpdate(true);
+    try {
+      const info = await checkForAppUpdates();
+      setUpdateInfo(info);
+    } catch (e) {
+      setUpdateInfo({
+        status: 'error',
+        currentVersion: CURRENT_APP_VERSION,
+        errorMessage: 'خطا در برقراری ارتباط با سرور آپدیت.',
+      });
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -228,6 +257,8 @@ export default function App() {
         onPrint={handlePrint}
         isDarkMode={isDarkMode}
         toggleDarkMode={() => setIsDarkMode((prev) => !prev)}
+        onCheckUpdates={handleCheckForUpdates}
+        isElectron={isElectron}
       />
 
       {/* Main Content Area: 100% Fluid Width */}
@@ -356,6 +387,15 @@ export default function App() {
           setStudentInfo={setStudentInfo}
         />
       )}
+
+      {/* Update Modal (Desktop / Windows) */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+        isChecking={isCheckingUpdate}
+        onCheckAgain={handleCheckForUpdates}
+      />
 
       {/* Toast Notification Notification */}
       {toastMessage && (

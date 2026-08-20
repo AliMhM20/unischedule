@@ -1,7 +1,8 @@
 import React from 'react';
 import { 
   Calendar, LayoutGrid, Plus, Printer, 
-  HelpCircle, Layers, Moon, Sun, BookOpen 
+  HelpCircle, Layers, Moon, Sun, BookOpen,
+  RefreshCw 
 } from 'lucide-react';
 import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
@@ -17,6 +18,8 @@ interface NavbarProps {
   onPrint: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  onCheckUpdates?: () => void;
+  isElectron?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,6 +33,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onPrint,
   isDarkMode,
   toggleDarkMode,
+  onCheckUpdates,
+  isElectron,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200 print:hidden">
@@ -109,6 +114,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
+
+          {/* Check for Updates (Desktop Exclusive) */}
+          {isElectron && onCheckUpdates && (
+            <button
+              type="button"
+              onClick={onCheckUpdates}
+              title="بررسی به‌روزرسانی نسخه ویندوز"
+              className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4 text-indigo-500 dark:text-emerald-400" />
+              <span className="hidden md:inline text-xs font-bold">آپدیت</span>
+            </button>
+          )}
 
           {/* Print / Save */}
           <button

@@ -1,5 +1,13 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
+
+// IPC Handlers
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('open-external', async (_, url) => {
+  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    await shell.openExternal(url);
+  }
+});
 
 app.name = 'UniSchedule';
 try {
