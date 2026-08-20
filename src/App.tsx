@@ -6,6 +6,7 @@ import { ExamTimelineView } from './components/ExamTimelineView';
 import { HelpAndRules } from './components/HelpAndRules';
 import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
+import { Footer } from './components/Footer';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
@@ -239,7 +240,7 @@ export default function App() {
             {/* Catalog Banner */}
             <button
               onClick={() => setIsCatalogModalOpen(true)}
-              className="w-full relative overflow-hidden bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md hover:shadow-lg active:scale-[0.99] group text-right"
+              className="w-full relative overflow-hidden bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 bg-[length:200%_200%] animate-gradient hover:opacity-90 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md hover:shadow-lg active:scale-[0.99] group text-right print:hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
               <div className="absolute bottom-0 left-0 w-40 h-40 bg-black opacity-10 rounded-full -ml-10 -mb-10 blur-3xl"></div>
@@ -262,7 +263,7 @@ export default function App() {
             </button>
 
             {/* 1. Courses & Units Summary Panel (On Top) */}
-            <div className="w-full">
+            <div className="w-full print:hidden">
               <CourseListSidebar
                 courses={activePlan.courses}
                 onAddCourse={() => {
@@ -322,6 +323,7 @@ export default function App() {
           </div>
         )}
 
+        <Footer />
       </main>
 
       {/* Floating Add/Edit Course Modal */}

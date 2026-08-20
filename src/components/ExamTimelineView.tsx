@@ -60,7 +60,7 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
     <div className="space-y-6 transition-colors duration-200">
       
       {/* Overview Card */}
-      <div className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-indigo-200 dark:border-[#00B87C]/50 p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-indigo-200 dark:border-[#00B87C]/50 p-6 shadow-xs flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-indigo-600 dark:text-emerald-500" />
@@ -104,7 +104,7 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onEditCourse(c.courseA)}
-                  className="px-2.5 py-1 bg-rose-600 dark:bg-rose-700 text-white rounded-lg font-bold text-[11px] hover:bg-rose-700 dark:hover:bg-rose-600"
+                  className="px-2.5 py-1 bg-rose-600 dark:bg-rose-700 text-white rounded-lg font-bold text-[11px] hover:bg-rose-700 dark:hover:bg-rose-600 print:hidden"
                 >
                   ویرایش تاریخ
                 </button>
@@ -129,7 +129,7 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="px-4 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            className="px-4 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer print:hidden"
           >
             + افزودن اولین درس
           </button>
@@ -198,7 +198,7 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                 </div>
 
                 {/* Footer Action */}
-                <div className="pt-2 border-t border-slate-100 dark:border-[#2a2b30] flex justify-end">
+                <div className="pt-2 border-t border-slate-100 dark:border-[#2a2b30] flex justify-end print:hidden">
                   <button
                     type="button"
                     onClick={() => onEditCourse(course)}

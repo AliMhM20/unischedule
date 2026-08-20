@@ -110,7 +110,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 print:hidden">
           <button
             type="button"
             onClick={onToggleFriday}
@@ -337,7 +337,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       {/* Floating Modal for Course Card Quick View / Actions */}
       {selectedCourseCard && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in print:hidden"
           onClick={() => setSelectedCourseCard(null)}
         >
           <div 

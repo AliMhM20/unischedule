@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   toggleDarkMode,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200 print:hidden">
       <div className="w-full px-3 xs:px-4 sm:px-6 h-15 flex items-center justify-between gap-1 xs:gap-2 sm:gap-4 overflow-hidden">
         
         {/* ZONE 1: BRAND TITLE (Never wraps, scales smoothly) */}
