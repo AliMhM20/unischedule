@@ -41,6 +41,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [examFilter, setExamFilter] = useState<'all' | 'has_exam' | 'no_exam'>('all');
+  const [unitFilter, setUnitFilter] = useState<string>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,9 +98,11 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         (examFilter === 'has_exam' && course.exam) || 
         (examFilter === 'no_exam' && !course.exam);
 
-      return matchesSearch && matchesDay && matchesExam;
+      const matchesUnits = unitFilter === 'all' || course.credits === parseInt(unitFilter, 10);
+
+      return matchesSearch && matchesDay && matchesExam && matchesUnits;
     });
-  }, [catalogCourses, searchQuery, selectedDay, examFilter]);
+  }, [catalogCourses, searchQuery, selectedDay, examFilter, unitFilter]);
 
   const hasCatalog = catalogCourses.length > 0;
 
@@ -146,61 +149,14 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
               {hasCatalog && (
                 <button
                   onClick={() => setShowUploadView(false)}
-                  className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors"
+                  className="w-full py-2.5 bg-rose-50 dark:bg-rose-900/10 hover:bg-rose-100 dark:hover:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/30 rounded-xl text-sm font-bold transition-colors"
                 >
                   بازگشت به لیست دروس (انصراف)
                 </button>
               )}
 
-              {error && (
-                <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 p-4 rounded-2xl text-sm font-bold flex items-start gap-2 border border-rose-100 dark:border-rose-900/30">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <p>{error}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-4">
-                {/* Method 1: File Upload */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-purple-200 dark:border-purple-900/30 rounded-3xl bg-white dark:bg-[#131416] hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors group"
-                >
-                  <input 
-                    type="file" 
-                    accept=".html,.htm" 
-                    className="hidden" 
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                  />
-                  <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Upload className="w-8 h-8" />
-                  </div>
-                  <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">انتخاب فایل HTML</span>
-                  <span className="text-slate-500 dark:text-slate-400 text-xs mt-2">فایل ذخیره شده با پسوند html. را انتخاب کنید</span>
-                </button>
-
-                {/* Method 2: Paste Code */}
-                <div className="bg-white dark:bg-[#131416] p-4 rounded-3xl border border-slate-200 dark:border-[#2a2b30]">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 px-1">یا کد HTML را در اینجا پیست کنید:</p>
-                  <textarea
-                    value={htmlInput}
-                    onChange={(e) => setHtmlInput(e.target.value)}
-                    placeholder="<html dir='rtl'>...</html>"
-                    className="w-full h-32 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl p-3 text-left text-xs font-mono text-slate-600 dark:text-slate-400 focus:outline-none focus:border-purple-400 dark:focus:border-purple-500 focus:ring-1 focus:ring-purple-400 dark:focus:ring-purple-500 transition-all resize-none mb-3"
-                    dir="ltr"
-                  />
-                  <button
-                    onClick={() => handleProcessHtml(htmlInput)}
-                    disabled={!htmlInput.trim()}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-bold transition-colors"
-                  >
-                    پردازش کد وارد شده
-                  </button>
-                </div>
-              </div>
-
               {/* Guide */}
-              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl overflow-hidden text-sm transition-all">
+              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl overflow-hidden text-sm transition-all relative z-20">
                 <details className="group">
                   <summary className="font-bold text-blue-800 dark:text-blue-300 p-5 cursor-pointer flex items-center justify-between list-none [&::-webkit-details-marker]:hidden">
                     <div className="flex items-center gap-2">
@@ -259,6 +215,55 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                 </details>
               </div>
 
+              {error && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 p-4 rounded-2xl text-sm font-bold flex items-start gap-2 border border-rose-100 dark:border-rose-900/30">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4">
+                {/* Method 1: File Upload */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-purple-200 dark:border-purple-900/30 rounded-3xl bg-white dark:bg-[#131416] hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors group"
+                >
+                  <input 
+                    type="file" 
+                    accept=".html,.htm" 
+                    className="hidden" 
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                  />
+                  <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Upload className="w-8 h-8" />
+                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">انتخاب فایل HTML</span>
+                  <span className="text-slate-500 dark:text-slate-400 text-xs mt-2">فایل ذخیره شده با پسوند html. را انتخاب کنید</span>
+                </button>
+
+                {/* Method 2: Paste Code */}
+                <div className="bg-white dark:bg-[#131416] p-4 rounded-3xl border border-slate-200 dark:border-[#2a2b30]">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 px-1">یا کد HTML را در اینجا پیست کنید:</p>
+                  <textarea
+                    value={htmlInput}
+                    onChange={(e) => setHtmlInput(e.target.value)}
+                    placeholder="<html dir='rtl'>...</html>"
+                    className="w-full h-32 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl p-3 text-left text-xs font-mono text-slate-600 dark:text-slate-400 focus:outline-none focus:border-purple-400 dark:focus:border-purple-500 focus:ring-1 focus:ring-purple-400 dark:focus:ring-purple-500 transition-all resize-none mb-3"
+                    dir="ltr"
+                  />
+                  <button
+                    onClick={() => handleProcessHtml(htmlInput)}
+                    disabled={!htmlInput.trim()}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-bold transition-colors"
+                  >
+                    پردازش کد وارد شده
+                  </button>
+                </div>
+              </div>
+
+
+
             </div>
           ) : (
             /* ================= STATE 2: BROWSE & QUICK ADD ================= */
@@ -294,24 +299,24 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="relative flex-1">
-                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                      <Search className="h-4 w-4 text-slate-400" />
+                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-slate-400" />
                     </div>
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="جستجوی درس، کد، استاد..."
-                      className="block w-full rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] pr-10 text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
+                      className="block w-full h-12 rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] pr-12 text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
                     />
                   </div>
                   
-                  <div className="flex gap-2">
-                    <div className="relative min-w-[120px]">
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                    <div className="relative min-w-[120px] flex-1 sm:flex-none">
                       <select
                         value={selectedDay}
                         onChange={(e) => setSelectedDay(e.target.value)}
-                        className="block w-full rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
+                        className="block w-full h-12 rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
                       >
                         <option value="all">همه روزها</option>
                         <option value="saturday">شنبه</option>
@@ -323,11 +328,25 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                         <option value="friday">جمعه</option>
                       </select>
                     </div>
-                    <div className="relative min-w-[140px]">
+                    <div className="relative min-w-[120px] flex-1 sm:flex-none">
+                      <select
+                        value={unitFilter}
+                        onChange={(e) => setUnitFilter(e.target.value)}
+                        className="block w-full h-12 rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
+                      >
+                        <option value="all">تعداد واحد</option>
+                        <option value="0">۰ واحد</option>
+                        <option value="1">۱ واحد</option>
+                        <option value="2">۲ واحد</option>
+                        <option value="3">۳ واحد</option>
+                        <option value="4">۴ واحد</option>
+                      </select>
+                    </div>
+                    <div className="relative min-w-[130px] flex-1 sm:flex-none">
                       <select
                         value={examFilter}
                         onChange={(e) => setExamFilter(e.target.value as any)}
-                        className="block w-full rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
+                        className="block w-full h-12 rounded-xl border-slate-200 dark:border-[#2a2b30] bg-slate-50 dark:bg-[#0b0c0e] text-sm focus:border-purple-500 focus:ring-purple-500 dark:text-white"
                       >
                         <option value="all">وضعیت امتحان</option>
                         <option value="has_exam">دارای امتحان</option>

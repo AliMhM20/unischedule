@@ -384,7 +384,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   تعداد واحد درس
                 </label>
                 <div className="flex items-center gap-2">
-                  {[0, 1, 2, 3, 4, 5].map((u) => (
+                  {[0, 1, 2, 3, 4].map((u) => (
                     <button
                       key={u}
                       type="button"
