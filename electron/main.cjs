@@ -40,7 +40,10 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('start-download-update', async () => {
   try {
-    await autoUpdater.downloadUpdate();
+    if (app.isPackaged) {
+      await autoUpdater.checkForUpdates();
+      await autoUpdater.downloadUpdate();
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };

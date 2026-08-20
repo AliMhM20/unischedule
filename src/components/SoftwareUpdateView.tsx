@@ -79,6 +79,9 @@ export const SoftwareUpdateView: React.FC = () => {
     setIsChecking(true);
     setDownloadError(null);
     try {
+      if (window.electronAPI?.checkForUpdates) {
+        window.electronAPI.checkForUpdates().catch(() => {});
+      }
       const ver = (await window.electronAPI?.getVersion?.()) || currentVersion;
       const info = await checkForAppUpdates(ver);
       setUpdateInfo(info);
