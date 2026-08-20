@@ -1,15 +1,15 @@
 import React from 'react';
 import { 
-  Calendar, LayoutGrid, Plus, Printer, 
-  HelpCircle, Layers, Moon, Sun, BookOpen,
-  RefreshCw 
+  LayoutGrid, Plus, Printer, 
+  HelpCircle, Layers, Moon, Sun,
+  ArrowUpCircle 
 } from 'lucide-react';
 import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
 
 interface NavbarProps {
-  activeTab: 'grid' | 'help';
-  setActiveTab: (tab: 'grid' | 'help') => void;
+  activeTab: 'grid' | 'help' | 'update';
+  setActiveTab: (tab: 'grid' | 'help' | 'update') => void;
   onOpenAddModal: () => void;
   plans: SchedulePlan[];
   activePlanId: string;
@@ -18,8 +18,6 @@ interface NavbarProps {
   onPrint: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
-  onCheckUpdates?: () => void;
-  isElectron?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,14 +31,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onPrint,
   isDarkMode,
   toggleDarkMode,
-  onCheckUpdates,
-  isElectron,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200 print:hidden">
       <div className="w-full px-3 xs:px-4 sm:px-6 h-15 flex items-center justify-between gap-1 xs:gap-2 sm:gap-4 overflow-hidden">
         
-        {/* ZONE 1: BRAND TITLE (Never wraps, scales smoothly) */}
+        {/* ZONE 1: BRAND TITLE */}
         <div className="flex items-center min-w-0 shrink">
           <span className="font-black text-[11px] min-[380px]:text-xs sm:text-sm md:text-base lg:text-lg tracking-tight text-slate-900 dark:text-slate-100 truncate">
             برنامه‌ریز انتخاب واحد دانشگاه
@@ -52,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'grid'
                 ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -65,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('help')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'help'
                 ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -74,9 +70,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             راهنما و قوانین تداخل
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('update')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'update'
+                ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5" />
+            به‌روزرسانی نرم‌افزار
+          </button>
         </nav>
 
-        {/* ZONE 3: ACTIONS (Plan selector, Print, Add Course) */}
+        {/* ZONE 3: ACTIONS (Plan selector, Theme, Print, Add Course) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           
           {/* Plan / Scenario Switcher (Desktop only) */}
@@ -110,30 +119,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={toggleDarkMode}
             title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
-            className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0"
+            className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0 cursor-pointer"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-
-          {/* Check for Updates (Desktop Exclusive) */}
-          {isElectron && onCheckUpdates && (
-            <button
-              type="button"
-              onClick={onCheckUpdates}
-              title="بررسی به‌روزرسانی نسخه ویندوز"
-              className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0 cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4 text-indigo-500 dark:text-emerald-400" />
-              <span className="hidden md:inline text-xs font-bold">آپدیت</span>
-            </button>
-          )}
 
           {/* Print / Save */}
           <button
             type="button"
             onClick={onPrint}
             title="چاپ یا ذخیره PDF برنامه"
-            className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0"
+            className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
           </button>
@@ -182,11 +178,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Sub-Nav Tab Bar for screens below lg breakpoint */}
-      <div className="flex lg:hidden border-t border-slate-200 dark:border-[#2a2b30] bg-slate-50/90 dark:bg-[#131416]/90 px-3 py-1.5 justify-center gap-1.5 transition-colors duration-200">
+      <div className="flex lg:hidden border-t border-slate-200 dark:border-[#2a2b30] bg-slate-50/90 dark:bg-[#131416]/90 px-2 sm:px-3 py-1.5 justify-center gap-1 sm:gap-1.5 transition-colors duration-200 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('grid')}
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold py-1.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'grid' 
               ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -199,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('help')}
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold py-1.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'help' 
               ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -207,6 +203,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <HelpCircle className="w-3.5 h-3.5" />
           <span>راهنما</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('update')}
+          className={`flex-1 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'update' 
+              ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <ArrowUpCircle className="w-3.5 h-3.5" />
+          <span>به‌روزرسانی</span>
         </button>
       </div>
 

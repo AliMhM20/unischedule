@@ -4,14 +4,13 @@ import { TimetableGrid } from './components/TimetableGrid';
 import { CourseListSidebar } from './components/CourseListSidebar';
 import { ExamTimelineView } from './components/ExamTimelineView';
 import { HelpAndRules } from './components/HelpAndRules';
+import { SoftwareUpdateView } from './components/SoftwareUpdateView';
 import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
-import { UpdateModal } from './components/UpdateModal';
 import { Footer } from './components/Footer';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
-import { checkForAppUpdates, UpdateInfo, CURRENT_APP_VERSION } from './utils/updateChecker';
 import { CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
@@ -19,15 +18,9 @@ const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
 const CATALOG_STORAGE_KEY = 'unischedule_catalog_courses';
 const STUDENT_INFO_KEY = 'unischedule_student_info';
 
-// Check if running inside Electron desktop app
-const isElectron = typeof window !== 'undefined' && (
-  Boolean(window.electronAPI?.isElectron) ||
-  window.navigator.userAgent.toLowerCase().includes('electron')
-);
-
 export default function App() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<'grid' | 'help'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'help' | 'update'>('grid');
   const [showFriday, setShowFriday] = useState<boolean>(false);
 
   // Catalog State
@@ -71,12 +64,13 @@ export default function App() {
     ];
   });
 
+  // Active Plan ID
   const [activePlanId, setActivePlanId] = useState<string>(() => {
     try {
-      const savedId = localStorage.getItem(ACTIVE_PLAN_KEY);
-      if (savedId) return savedId;
+      const saved = localStorage.getItem(ACTIVE_PLAN_KEY);
+      if (saved) return saved;
     } catch (e) {
-      // ignore
+      // fallback
     }
     return 'plan-1';
   });
@@ -121,30 +115,8 @@ export default function App() {
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [prefilledSlot, setPrefilledSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
-
-  // Check for updates handler
-  const handleCheckForUpdates = async () => {
-    setIsUpdateModalOpen(true);
-    setIsCheckingUpdate(true);
-    try {
-      const currentVer = (await window.electronAPI?.getVersion?.()) || CURRENT_APP_VERSION;
-      const info = await checkForAppUpdates(currentVer);
-      setUpdateInfo(info);
-    } catch (e) {
-      setUpdateInfo({
-        status: 'error',
-        currentVersion: CURRENT_APP_VERSION,
-        errorMessage: 'خطا در برقراری ارتباط با سرور آپدیت.',
-      });
-    } finally {
-      setIsCheckingUpdate(false);
-    }
-  };
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -170,62 +142,61 @@ export default function App() {
 
   // Handler: Save (Add or Update) Course
   const handleSaveCourse = (course: Course) => {
-    setPlans((prevPlans) =>
-      prevPlans.map((p) => {
-        if (p.id !== activePlan.id) return p;
+    const isExisting = activePlan.courses.some((c) => c.id === course.id);
+    let updatedCourses: Course[];
 
-        const exists = p.courses.some((c) => c.id === course.id);
-        let updatedCourses: Course[];
+    if (isExisting) {
+      updatedCourses = activePlan.courses.map((c) => (c.id === course.id ? course : c));
+      showToast(`درس «${course.name}» به‌روزرسانی شد.`, 'success');
+    } else {
+      updatedCourses = [...activePlan.courses, course];
+      showToast(`درس «${course.name}» به برنامه اضافه شد.`, 'success');
+    }
 
-        if (exists) {
-          updatedCourses = p.courses.map((c) => (c.id === course.id ? course : c));
-          showToast(`درس «${course.name}» با موفقیت ویرایش شد.`, 'success');
-        } else {
-          updatedCourses = [...p.courses, course];
-          showToast(`درس «${course.name}» به جدول برنامه هفتگی اضافه گردید.`, 'success');
-        }
-
-        return {
-          ...p,
-          courses: updatedCourses,
-        };
-      })
+    const updatedPlans = plans.map((p) =>
+      p.id === activePlan.id ? { ...p, courses: updatedCourses } : p
     );
+    setPlans(updatedPlans);
+    setIsFormModalOpen(false);
+    setEditingCourse(null);
+    setPrefilledSlot(null);
   };
 
   // Handler: Delete Course
   const handleDeleteCourse = (courseId: string) => {
-    const targetCourse = activePlan.courses.find((c) => c.id === courseId);
-    setPlans((prevPlans) =>
-      prevPlans.map((p) => {
-        if (p.id !== activePlan.id) return p;
-        return {
-          ...p,
-          courses: p.courses.filter((c) => c.id !== courseId),
-        };
-      })
+    const courseToDelete = activePlan.courses.find((c) => c.id === courseId);
+    const updatedCourses = activePlan.courses.filter((c) => c.id !== courseId);
+    const updatedPlans = plans.map((p) =>
+      p.id === activePlan.id ? { ...p, courses: updatedCourses } : p
     );
-    if (targetCourse) {
-      showToast(`درس «${targetCourse.name}» از برنامه حذف شد.`, 'success');
+    setPlans(updatedPlans);
+    if (courseToDelete) {
+      showToast(`درس «${courseToDelete.name}» حذف شد.`, 'success');
     }
   };
 
-  // Handler: Clear All Courses in active plan
+  // Handler: Clear All Courses
   const handleClearAllCourses = () => {
-    setPlans((prevPlans) =>
-      prevPlans.map((p) => (p.id === activePlan.id ? { ...p, courses: [] } : p))
-    );
-    showToast('تمامی دروس این برنامه پاکسازی شدند.', 'success');
+    if (activePlan.courses.length === 0) return;
+    if (window.confirm('آیا مطمئن هستید که می‌خواهید همه دروس این برنامه را حذف کنید؟')) {
+      const updatedPlans = plans.map((p) =>
+        p.id === activePlan.id ? { ...p, courses: [] } : p
+      );
+      setPlans(updatedPlans);
+      showToast('تمام دروس برنامه حذف شدند.', 'success');
+    }
   };
 
   // Handler: Add New Scenario Plan
   const handleAddNewPlan = () => {
-    const planNumber = plans.length + 1;
+    const planLetters = ['الف', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ی'];
+    const nextIndex = plans.length;
+    const letter = planLetters[nextIndex] || toPersianDigits(nextIndex + 1);
     const newPlanId = `plan-${Date.now()}`;
     const newPlan: SchedulePlan = {
       id: newPlanId,
-      name: `سناریو شماره ${toPersianDigits(planNumber)} (پلان ${planNumber === 2 ? 'ب' : planNumber === 3 ? 'ج' : planNumber})`,
-      courses: [...activePlan.courses],
+      name: `سناریوی ${letter}`,
+      courses: [],
       createdAt: Date.now(),
     };
 
@@ -258,12 +229,10 @@ export default function App() {
         onPrint={handlePrint}
         isDarkMode={isDarkMode}
         toggleDarkMode={() => setIsDarkMode((prev) => !prev)}
-        onCheckUpdates={handleCheckForUpdates}
-        isElectron={isElectron}
       />
 
       {/* Main Content Area: 100% Fluid Width */}
-      <main className="flex-1 w-full p-6 space-y-6">
+      <main className="flex-1 w-full p-4 sm:p-6 space-y-6">
         
         {/* TAB 1: WEEKLY TIMETABLE GRID */}
         {activeTab === 'grid' && (
@@ -272,7 +241,7 @@ export default function App() {
             {/* Catalog Banner */}
             <button
               onClick={() => setIsCatalogModalOpen(true)}
-              className="w-full relative overflow-hidden bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 bg-[length:200%_200%] animate-gradient hover:opacity-90 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md hover:shadow-lg active:scale-[0.99] group text-right print:hidden"
+              className="w-full relative overflow-hidden bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 bg-[length:200%_200%] animate-gradient hover:opacity-90 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md hover:shadow-lg active:scale-[0.99] group text-right print:hidden cursor-pointer"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
               <div className="absolute bottom-0 left-0 w-40 h-40 bg-black opacity-10 rounded-full -ml-10 -mb-10 blur-3xl"></div>
@@ -348,13 +317,21 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: HELP & REGULATIONS */}
+        {/* TAB 2: HELP & REGULATIONS */}
         {activeTab === 'help' && (
           <div className="w-full">
             <HelpAndRules />
           </div>
         )}
 
+        {/* TAB 3: SOFTWARE UPDATE (Full Page View) */}
+        {activeTab === 'update' && (
+          <div className="w-full">
+            <SoftwareUpdateView />
+          </div>
+        )}
+
+        {/* Footer always visible on all tabs */}
         <Footer />
       </main>
 
@@ -388,15 +365,6 @@ export default function App() {
           setStudentInfo={setStudentInfo}
         />
       )}
-
-      {/* Update Modal (Desktop / Windows) */}
-      <UpdateModal
-        isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-        updateInfo={updateInfo}
-        isChecking={isCheckingUpdate}
-        onCheckAgain={handleCheckForUpdates}
-      />
 
       {/* Toast Notification Notification */}
       {toastMessage && (

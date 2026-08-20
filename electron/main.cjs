@@ -91,8 +91,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: 360,
+    minHeight: 480,
     title: 'برنامه‌ریز انتخاب واحد و تقویم دانشگاه',
     icon: path.join(__dirname, '../build/icon.png'),
     autoHideMenuBar: true,
