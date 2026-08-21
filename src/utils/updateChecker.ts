@@ -1,4 +1,4 @@
-export const CURRENT_APP_VERSION = '1.2.8';
+export const CURRENT_APP_VERSION = '1.2.9';
 
 export interface UpdateInfo {
   status: 'checking' | 'update_available' | 'up_to_date' | 'no_internet' | 'error';

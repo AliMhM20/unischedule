@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'نسخه مورد نظر برای انتشار (مثال: 1.2.8)'
+        description: 'نسخه مورد نظر برای انتشار (مثال: 1.2.9)'
         required: false
-        default: '1.2.8'
+        default: '1.2.9'
 
 permissions:
   contents: write
