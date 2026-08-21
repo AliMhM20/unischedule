@@ -59,13 +59,6 @@ export const Footer: React.FC = () => {
           </a>
         </div>
 
-        {/* Test Banner for Auto-Update Verification (Desktop Electron Only) */}
-        {typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron) && (
-          <div className="w-full max-w-2xl mx-auto p-4 bg-rose-500/10 dark:bg-rose-950/30 border-2 border-rose-500 dark:border-rose-500/60 rounded-2xl text-center text-rose-600 dark:text-rose-400 font-black text-sm shadow-xs">
-            (این پنجره برای تست آپدیت خودکار 2 است)
-          </div>
-        )}
-
       </div>
     </footer>
   );
