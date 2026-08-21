@@ -45,9 +45,7 @@ jobs:
         run: npm install
 
       - name: Build Application & Electron Binaries
-        run: npm run electron:build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build -- --publish never
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
