@@ -42,10 +42,13 @@ jobs:
           echo "Building UniSchedule Version: $CLEAN_VER"
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --include=optional
 
       - name: Build Application & Electron Binaries
-        run: npm run electron:build -- --publish never
+        shell: bash
+        run: |
+          npm run build -- --base=./
+          npx electron-builder --publish never
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
