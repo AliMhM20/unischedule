@@ -8,8 +8,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-4.1-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 
-**UniSchedule** 
-یک ابزار مدرن، آزاد و متن‌باز (Open-Source) است که با هدف تسهیل، سرعت‌بخشی و بهینه‌سازی فرآیند انتخاب واحد و برنامه‌ریزی تحصیلی برای دانشجویان دانشگاه‌ها طراحی و توسعه یافته است.
+برنامه **UniSchedule** یک ابزار مدرن، آزاد و متن‌باز (Open-Source) است که با هدف تسهیل، سرعت‌بخشی و بهینه‌سازی فرآیند انتخاب واحد و برنامه‌ریزی تحصیلی برای دانشجویان دانشگاه‌ها طراحی و توسعه یافته است.
 
 ---
 
