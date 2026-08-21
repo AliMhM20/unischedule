@@ -1,11 +1,13 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
-const { autoUpdater } = require('electron-updater');
+const { autoUpdater, CancellationToken } = require('electron-updater');
 
 // Configure autoUpdater for differential updates
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
 autoUpdater.allowDowngrade = false;
+
+let cancellationToken = null;
 
 // IPC Handlers
 ipcMain.handle('get-app-version', () => app.getVersion());
@@ -42,16 +44,41 @@ ipcMain.handle('start-download-update', async () => {
   try {
     if (app.isPackaged) {
       await autoUpdater.checkForUpdates();
-      await autoUpdater.downloadUpdate();
+      cancellationToken = new CancellationToken();
+      await autoUpdater.downloadUpdate(cancellationToken);
     }
     return { success: true };
   } catch (err) {
+    if (err?.message?.includes('cancelled') || err?.name === 'CancellationError') {
+      return { success: true, cancelled: true };
+    }
     return { success: false, error: err.message };
   }
 });
 
+ipcMain.handle('pause-download', () => {
+  if (cancellationToken) {
+    cancellationToken.cancel();
+    cancellationToken = null;
+  }
+  return { success: true };
+});
+
+ipcMain.handle('cancel-download', () => {
+  if (cancellationToken) {
+    cancellationToken.cancel();
+    cancellationToken = null;
+  }
+  return { success: true };
+});
+
 ipcMain.handle('quit-and-install', () => {
-  autoUpdater.quitAndInstall(false, true);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
+  setImmediate(() => {
+    autoUpdater.quitAndInstall(false, true);
+  });
 });
 
 // AutoUpdater Event Listeners -> Forward to renderer
@@ -72,6 +99,12 @@ autoUpdater.on('update-downloaded', (info) => {
       version: info?.version,
       releaseNotes: info?.releaseNotes,
     });
+  }
+});
+
+autoUpdater.on('update-cancelled', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater-cancelled');
   }
 });
 

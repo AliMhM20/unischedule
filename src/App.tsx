@@ -324,8 +324,8 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: SOFTWARE UPDATE (Full Page View) */}
-        {activeTab === 'update' && (
+        {/* TAB 3: SOFTWARE UPDATE (Desktop Electron Only) */}
+        {activeTab === 'update' && typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron) && (
           <div className="w-full">
             <SoftwareUpdateView />
           </div>

@@ -71,18 +71,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             راهنما و قوانین تداخل
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('update')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'update'
-                ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <ArrowUpCircle className="w-3.5 h-3.5" />
-            به‌روزرسانی نرم‌افزار
-          </button>
+          {typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('update')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'update'
+                  ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <ArrowUpCircle className="w-3.5 h-3.5" />
+              به‌روزرسانی نرم‌افزار
+            </button>
+          )}
         </nav>
 
         {/* ZONE 3: ACTIONS (Plan selector, Theme, Print, Add Course) */}
@@ -205,18 +207,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>راهنما</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('update')}
-          className={`flex-1 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === 'update' 
-              ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          <ArrowUpCircle className="w-3.5 h-3.5" />
-          <span>به‌روزرسانی</span>
-        </button>
+        {typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron) && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('update')}
+            className={`flex-1 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'update' 
+                ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5" />
+            <span>به‌روزرسانی</span>
+          </button>
+        )}
       </div>
 
     </header>

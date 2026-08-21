@@ -50,12 +50,16 @@
       ]
     },
     "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "UniSchedule",
       "include": "build/installer.nsh"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}.${ext}"
     }
   },
   "dependencies": {

@@ -3,26 +3,35 @@ import {
   RefreshCw, WifiOff, CheckCircle2, Download, 
   AlertTriangle, Sparkles, ExternalLink, Zap, 
   Power, HardDriveDownload, ShieldCheck, Send, Globe,
-  Cpu, ArrowUpCircle
+  Cpu, ArrowUpCircle, Pause, Play, XCircle
 } from 'lucide-react';
 import { UpdateInfo, checkForAppUpdates, CURRENT_APP_VERSION } from '../utils/updateChecker';
 import { toPersianDigits } from '../utils/timeUtils';
 
 const GITHUB_API_URL = 'https://api.github.com/repos/AliMhM20/unischedule/releases/latest';
 const TELEGRAM_SUPPORT_URL = 'https://t.me/alimhm_20';
+const DOWNLOAD_PROGRESS_KEY = 'unischedule_last_download_progress';
 
 export const SoftwareUpdateView: React.FC = () => {
   const [currentVersion, setCurrentVersion] = useState<string>(CURRENT_APP_VERSION);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isDownloaded, setIsDownloaded] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<{
     percent: number;
     bytesPerSecond: number;
     transferred: number;
     total: number;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem(DOWNLOAD_PROGRESS_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Initialize version and auto-check on view mount
@@ -49,12 +58,24 @@ export const SoftwareUpdateView: React.FC = () => {
     if (window.electronAPI) {
       const unbindProgress = window.electronAPI.onDownloadProgress((prog) => {
         setIsDownloading(true);
+        setIsPaused(false);
         setDownloadProgress(prog);
+        try {
+          localStorage.setItem(DOWNLOAD_PROGRESS_KEY, JSON.stringify(prog));
+        } catch {
+          // ignore
+        }
       });
 
       const unbindDownloaded = window.electronAPI.onUpdateDownloaded(() => {
         setIsDownloading(false);
+        setIsPaused(false);
         setIsDownloaded(true);
+        localStorage.removeItem(DOWNLOAD_PROGRESS_KEY);
+      });
+
+      const unbindCancelled = window.electronAPI.onUpdateCancelled?.(() => {
+        setIsDownloading(false);
       });
 
       const unbindError = window.electronAPI.onUpdateError((err) => {
@@ -66,6 +87,7 @@ export const SoftwareUpdateView: React.FC = () => {
         isMounted = false;
         unbindProgress?.();
         unbindDownloaded?.();
+        unbindCancelled?.();
         unbindError?.();
       };
     }
@@ -100,8 +122,9 @@ export const SoftwareUpdateView: React.FC = () => {
     setDownloadError(null);
     if (window.electronAPI?.startDownloadUpdate) {
       setIsDownloading(true);
+      setIsPaused(false);
       const res = await window.electronAPI.startDownloadUpdate();
-      if (!res.success) {
+      if (!res.success && !res.cancelled) {
         setIsDownloading(false);
         setDownloadError(res.error || 'امکان شروع دانلود خودکار وجود ندارد.');
       }
@@ -111,6 +134,42 @@ export const SoftwareUpdateView: React.FC = () => {
       } else {
         window.open(updateInfo.downloadUrl, '_blank');
       }
+    }
+  };
+
+  const handlePauseDownload = async () => {
+    if (window.electronAPI?.pauseDownload) {
+      await window.electronAPI.pauseDownload();
+    }
+    setIsDownloading(false);
+    setIsPaused(true);
+  };
+
+  const handleResumeDownload = async () => {
+    setIsPaused(false);
+    setIsDownloading(true);
+    setDownloadError(null);
+    if (window.electronAPI?.startDownloadUpdate) {
+      const res = await window.electronAPI.startDownloadUpdate();
+      if (!res.success && !res.cancelled) {
+        setIsDownloading(false);
+        setDownloadError(res.error || 'امکان ادامه دانلود وجود ندارد.');
+      }
+    }
+  };
+
+  const handleCancelDownload = async () => {
+    if (window.electronAPI?.cancelDownload) {
+      await window.electronAPI.cancelDownload();
+    }
+    setIsDownloading(false);
+    setIsPaused(false);
+    setDownloadProgress(null);
+    setDownloadError(null);
+    try {
+      localStorage.removeItem(DOWNLOAD_PROGRESS_KEY);
+    } catch {
+      // ignore
     }
   };
 
@@ -246,14 +305,20 @@ export const SoftwareUpdateView: React.FC = () => {
                   آپدیت و راه‌اندازی مجدد برنامه
                 </button>
               </div>
-            ) : isDownloading ? (
-              /* Downloading Progress Bar View */
+            ) : (isDownloading || isPaused) ? (
+              /* Downloading Progress Bar & Control View */
               <div className="py-6 space-y-4 max-w-xl mx-auto">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <HardDriveDownload className="w-5 h-5 text-indigo-600 dark:text-emerald-400 animate-pulse" />
+                    {isPaused ? (
+                      <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center">
+                        <Pause className="w-3.5 h-3.5" />
+                      </div>
+                    ) : (
+                      <HardDriveDownload className="w-5 h-5 text-indigo-600 dark:text-emerald-400 animate-pulse" />
+                    )}
                     <span className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                      در حال دریافت فایل‌های به‌روزرسانی...
+                      {isPaused ? 'دانلود موقتاً متوقف شده است' : 'در حال دریافت فایل‌های به‌روزرسانی...'}
                     </span>
                   </div>
                   <span className="font-black text-sm text-indigo-600 dark:text-emerald-400 font-mono">
@@ -264,7 +329,9 @@ export const SoftwareUpdateView: React.FC = () => {
                 {/* Progress Bar */}
                 <div className="w-full h-3.5 bg-slate-100 dark:bg-[#131416] rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-[#2a2b30]">
                   <div 
-                    className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-300 ease-out"
+                    className={`h-full rounded-full transition-all duration-300 ease-out ${
+                      isPaused ? 'bg-amber-500' : 'bg-gradient-to-r from-indigo-500 to-emerald-500'
+                    }`}
                     style={{ width: `${downloadProgress?.percent || 0}%` }}
                   />
                 </div>
@@ -276,8 +343,40 @@ export const SoftwareUpdateView: React.FC = () => {
                   </span>
                   <span className="flex items-center gap-1 font-mono text-slate-700 dark:text-slate-300">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
-                    {formatSpeed(downloadProgress?.bytesPerSecond || 0)}
+                    {isPaused ? 'متوقف' : formatSpeed(downloadProgress?.bytesPerSecond || 0)}
                   </span>
+                </div>
+
+                {/* Download Control Actions (Pause / Resume / Cancel) */}
+                <div className="flex items-center justify-center gap-3 pt-3">
+                  {isDownloading ? (
+                    <button
+                      type="button"
+                      onClick={handlePauseDownload}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                    >
+                      <Pause className="w-3.5 h-3.5" />
+                      توقف موقت دانلود
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResumeDownload}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      ادامه دانلود
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCancelDownload}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 dark:bg-[#131416] hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-[#2a2b30] hover:border-rose-200 dark:hover:border-rose-900/40 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    لغو دانلود
+                  </button>
                 </div>
 
                 {downloadError && (
