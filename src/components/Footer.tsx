@@ -57,6 +57,9 @@ export const Footer: React.FC = () => {
             <Star className="w-4 h-4 text-amber-500" />
             <span dir="ltr">UniSchedule Repository</span>
           </a>
+        {/* Test Banner for Auto-Update Verification */}
+        <div className="w-full max-w-2xl mx-auto p-4 bg-rose-500/10 dark:bg-rose-950/30 border-2 border-rose-500 dark:border-rose-500/60 rounded-2xl text-center text-rose-600 dark:text-rose-400 font-black text-sm shadow-xs">
+          (این پنجره برای تست آپدیت خودکار است)
         </div>
 
       </div>
