@@ -7,3 +7,5 @@ coverage/
 !.env.example
 release/
 dist-electron/
+AiStudio Code/
+Beta Feature/

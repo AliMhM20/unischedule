@@ -1,8 +1,0 @@
-{
-  "name": "UniSchedule - برنامه‌ریز هفتگی و انتخاب واحد",
-  "description": "سامانه هوشمند و مینیمال چیدمان برنامه هفتگی دانشگاه، مدیریت تداخل کلاسی و امتحانات پایان ترم",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
