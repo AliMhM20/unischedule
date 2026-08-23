@@ -31,28 +31,40 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
     const instructor = normalizePersianText(cells[12]?.textContent || '');
 
     // Sessions from cells[13] (زمان و مکان ارائه)
+    // In KNTU, multiple sessions are often in the same cell separated by commas, 'درس(...)', or newlines
     const rawSessionsHtml = cells[13]?.innerHTML || '';
-    const sessionLines = rawSessionsHtml
-      .split(/<br\s*\/?>/i)
-      .map(l => normalizePersianText(l))
-      .filter(l => l.length > 0);
+    const cleanSessionText = rawSessionsHtml
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/<[^>]*>/g, ' ');
+    
+    const normalizedSessionsText = normalizePersianText(cleanSessionText);
+
+    // Match all occurrences of (Day) ... (StartTime)-(EndTime) ... optional (Location)
+    const sessionRegex = /(شنبه|یک\s*شنبه|دوشنبه|سه\s*شنبه|چهار\s*شنبه|چهارشنبه|پنج\s*شنبه|پنجشنبه|جمعه)\s*[:\s]*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})(?:\s*(?:مکان|مكان|کلاس|كلاس)?\s*:?\s*([^،,;\n\r<]+))?/gi;
 
     const sessions: ClassSession[] = [];
-    for (const line of sessionLines) {
-      const timeMatch = line.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
-      if (timeMatch) {
-        const startTime = timeMatch[1].padStart(5, '0');
-        const endTime = timeMatch[2].padStart(5, '0');
-        const dayPart = line.substring(0, timeMatch.index);
-        const day = mapPersianDayToDayOfWeek(dayPart);
-        if (day) {
-          sessions.push({
-            id: 'sess_' + Math.random().toString(36).substring(2, 9),
-            day,
-            startTime,
-            endTime
-          });
-        }
+    let detectedLocation: string | undefined = undefined;
+
+    let sessionMatch: RegExpExecArray | null;
+    while ((sessionMatch = sessionRegex.exec(normalizedSessionsText)) !== null) {
+      const dayStr = sessionMatch[1];
+      const startTime = sessionMatch[2].padStart(5, '0');
+      const endTime = sessionMatch[3].padStart(5, '0');
+      const loc = sessionMatch[4] ? normalizePersianText(sessionMatch[4]) : undefined;
+      
+      if (loc && !detectedLocation) {
+        detectedLocation = loc;
+      }
+      
+      const day = mapPersianDayToDayOfWeek(dayStr);
+      if (day) {
+        sessions.push({
+          id: 'sess_' + Math.random().toString(36).substring(2, 9),
+          day,
+          startTime,
+          endTime
+        });
       }
     }
 
@@ -86,6 +98,7 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
       faculty: faculty || undefined,
       department: department || undefined,
       capacity,
+      location: detectedLocation || undefined,
       color: colorAssigner.getColor(codeGroup),
       sessions,
       exam,

@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Course } from '../types/schedule';
 import { 
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
-  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare
+  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw
 } from 'lucide-react';
 import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity } from '../utils/parsers';
+import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
 import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme } from '../utils/timeUtils';
 
 // AUT Help Photos
@@ -64,6 +65,8 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const [htmlInput, setHtmlInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [selectedUniv, setSelectedUniv] = useState<UniversityId>(studentInfo?.universityId || 'aut');
+  const [storedSourcesCount, setStoredSourcesCount] = useState<number>(0);
+  const [isReloadingSources, setIsReloadingSources] = useState<boolean>(false);
   const [detectedToast, setDetectedToast] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -95,20 +98,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
-
   const hasCatalog = catalogCourses.length > 0;
   const isImportViewOpen = !hasCatalog || uploadMode !== 'none';
   const isAppendMode = uploadMode === 'append';
-
-  // Count hidden and active courses
-  const hiddenCount = useMemo(() => {
-    return catalogCourses.filter(c => c.isHidden).length;
-  }, [catalogCourses]);
-
-  const activeCount = useMemo(() => {
-    return catalogCourses.filter(c => !c.isHidden).length;
-  }, [catalogCourses]);
 
   // Active university for parser & guides
   const activeUniversityId: UniversityId = hasCatalog 
@@ -119,6 +111,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     return SUPPORTED_UNIVERSITIES.find(u => u.id === (isAppendMode ? activeUniversityId : selectedUniv)) || SUPPORTED_UNIVERSITIES[0];
   }, [selectedUniv, activeUniversityId, isAppendMode]);
 
+  // Count hidden and active courses
+  const hiddenCount = useMemo(() => {
+    return catalogCourses.filter(c => c.isHidden).length;
+  }, [catalogCourses]);
+
+  const activeCount = useMemo(() => {
+    return catalogCourses.filter(c => !c.isHidden).length;
+  }, [catalogCourses]);
+
   // Extract unique faculties if present
   const availableFaculties = useMemo(() => {
     const set = new Set<string>();
@@ -127,6 +128,17 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     });
     return Array.from(set);
   }, [catalogCourses]);
+
+  // Sync stored raw HTML sources count
+  useEffect(() => {
+    if (isOpen) {
+      getCatalogSourcesCount(activeUniversityId).then(count => {
+        setStoredSourcesCount(count);
+      }).catch(err => {
+        console.warn('Failed to get catalog sources count', err);
+      });
+    }
+  }, [isOpen, activeUniversityId]);
 
   const handleProcessHtml = (htmlContent: string) => {
     try {
@@ -168,6 +180,11 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         } else {
           setDetectedToast('هیچ درس جدیدی اضافه نشد (تمام دروس فایل انتخابی قبلاً در بانک دروس موجود بودند).');
         }
+
+        // Save raw HTML to stored sources
+        appendCatalogSource(currentId, htmlContent).then(() => {
+          setStoredSourcesCount(prev => prev + 1);
+        }).catch(e => console.warn('Could not store source', e));
 
         // Check for different student identity in AUT or similar portals (Dual Personality Easter Egg)
         const hasDifferentIdentity = 
@@ -214,6 +231,11 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
           return;
         }
 
+        // Save fresh source to storage
+        saveFreshCatalogSource(activeUniv, htmlContent).then(() => {
+          setStoredSourcesCount(1);
+        }).catch(e => console.warn('Could not store source', e));
+
         setCatalogCourses(result.courses);
         setStudentInfo({
           name: result.studentName,
@@ -234,6 +256,67 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     } catch (err) {
       setError('خطا در پردازش فایل. لطفاً فایل جدول معتبر انتخاب کنید.');
       console.error(err);
+    }
+  };
+
+  // Reload catalog from all stored raw HTML sources
+  const handleReloadCatalogFromSources = async () => {
+    try {
+      setIsReloadingSources(true);
+      const targetUniv = hasCatalog ? activeUniversityId : selectedUniv;
+      const sources = await getCatalogSources(targetUniv);
+
+      if (sources.length === 0) {
+        setDetectedToast('هیچ منبع فایلی برای بارگذاری مجدد در حافظه یافت نشد.');
+        setTimeout(() => setDetectedToast(null), 3500);
+        return;
+      }
+
+      let allCourses: Course[] = [];
+      const existingSignatures = new Set<string>();
+      let latestStudent: { name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null = null;
+
+      for (const src of sources) {
+        const parsed = parseUniversityHtml(src.rawHtml, src.universityId);
+        if (parsed.studentName || parsed.studentId) {
+          latestStudent = {
+            name: parsed.studentName,
+            id: parsed.studentId,
+            universityName: parsed.universityName,
+            universityId: parsed.universityId,
+          };
+        }
+        for (const course of parsed.courses) {
+          const sig = getCourseSignature(course);
+          if (!existingSignatures.has(sig)) {
+            existingSignatures.add(sig);
+            // Reset hide status on reload
+            allCourses.push({ ...course, isHidden: false });
+          }
+        }
+      }
+
+      if (allCourses.length === 0) {
+        setError('خطا در پردازش فایل‌های ذخیره‌شده.');
+        return;
+      }
+
+      setCatalogCourses(allCourses);
+      if (latestStudent) {
+        setStudentInfo(latestStudent);
+      }
+      setSelectedCourseIds(new Set());
+      setUploadMode('none');
+      setError(null);
+      setDetectedToast(
+        `تعداد ${toPersianDigits(allCourses.length)} درس از روی ${toPersianDigits(sources.length)} فایل ذخیره‌شده با موفقیت بارگذاری مجدد شدند.`
+      );
+      setTimeout(() => setDetectedToast(null), 4000);
+    } catch (err) {
+      console.error('Failed to reload catalog from sources', err);
+      setError('خطا در بازیابی مجدد فایل‌ها از حافظه.');
+    } finally {
+      setIsReloadingSources(false);
     }
   };
 
@@ -436,6 +519,8 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     setTimeout(() => setDetectedToast(null), 3500);
   };
 
+  if (!isOpen) return null;
+
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 dark:bg-black/60 backdrop-blur-xs transition-opacity" 
@@ -526,6 +611,34 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   <ArrowRight className="w-4 h-4" />
                   <span>بازگشت به لیست دروس (انصراف)</span>
                 </button>
+              )}
+
+              {/* Restore Stored Sources Banner (if catalog is empty but sources exist) */}
+              {!isAppendMode && !hasCatalog && storedSourcesCount > 0 && (
+                <div className="bg-indigo-50/90 dark:bg-emerald-950/40 border border-indigo-200 dark:border-emerald-800/60 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
+                  <div className="flex items-center gap-3.5 text-right">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 dark:bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <RotateCw className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 block">
+                        تعداد {toPersianDigits(storedSourcesCount)} فایل HTML از قبل در حافظه ذخیره است
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 block mt-0.5 leading-relaxed">
+                        می‌توانید بدون نیاز به بارگذاری مجدد فایل‌ها، بانک دروس را از منابع قبلی بازیابی کنید.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleReloadCatalogFromSources}
+                    disabled={isReloadingSources}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-black transition-all shadow-sm flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer active:scale-95"
+                  >
+                    <RotateCw className={`w-4 h-4 ${isReloadingSources ? 'animate-spin' : ''}`} />
+                    <span>بازیابی و بارگذاری مجدد دروس</span>
+                  </button>
+                </div>
               )}
 
               {/* University Selector (Only displayed in Fresh / Replace mode) */}
@@ -812,6 +925,20 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   
                   {/* Action Buttons: Add More Courses & Replace Table */}
                   <div className="flex items-center gap-2">
+                    {storedSourcesCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleReloadCatalogFromSources}
+                        disabled={isReloadingSources}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#1c1d21] dark:hover:bg-[#2a2b30] rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-[#2a2b30] shadow-2xs active:scale-95 disabled:opacity-50"
+                        title="بارگذاری مجدد تمام فایل‌های ذخیره‌شده و بازنشانی وضعیت دروس"
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 ${isReloadingSources ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">بارگذاری مجدد ({toPersianDigits(storedSourcesCount)} فایل)</span>
+                        <span className="sm:hidden">بازخوانی ({toPersianDigits(storedSourcesCount)})</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         setUploadMode('append');
