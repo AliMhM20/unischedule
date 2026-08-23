@@ -32,6 +32,11 @@ export interface Course {
   sessions: ClassSession[];
   exam?: ExamInfo;
   notes?: string;
+  faculty?: string;
+  department?: string;
+  capacity?: number;
+  location?: string;
+  isHidden?: boolean;
   createdAt: number;
 }
 

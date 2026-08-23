@@ -14,7 +14,13 @@
 }
 
 .animate-gradient {
-  animation: gradient-xy 6s ease infinite;
+  background-size: 250% 250% !important;
+  animation: gradient-xy 7s ease infinite !important;
+}
+
+.animate-gradient-fast {
+  background-size: 250% 250% !important;
+  animation: gradient-xy 4.5s ease infinite !important;
 }
 
 @media print {

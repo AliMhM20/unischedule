@@ -292,11 +292,11 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                             </span>
                           </div>
 
-                          {/* Instructor (visible when space permits) */}
-                          {course.instructor && (
-                            <div className="hidden xs:flex items-center gap-0.5 text-[9.5px] sm:text-[10px] font-medium opacity-85 mt-0.5 truncate">
-                              <User className="w-2.5 h-2.5 shrink-0" />
-                              <span className="truncate">{course.instructor}</span>
+                          {/* Instructor (visible when available) */}
+                          {course.instructor && course.instructor.trim() !== '' && (
+                            <div className="flex items-center gap-0.5 text-[9px] sm:text-[9.5px] font-medium opacity-90 mt-0.5 truncate">
+                              <User className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                              <span className="truncate">{course.instructor.trim()}</span>
                             </div>
                           )}
                         </div>

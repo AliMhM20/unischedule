@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   LayoutGrid, Plus, Printer, 
   HelpCircle, Layers, Moon, Sun,
-  ArrowUpCircle 
+  ArrowUpCircle, ChevronDown, Check,
+  Pencil, Copy, Trash2, PlusCircle
 } from 'lucide-react';
 import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
@@ -14,7 +15,10 @@ interface NavbarProps {
   plans: SchedulePlan[];
   activePlanId: string;
   onSelectPlan: (planId: string) => void;
-  onAddPlan: () => void;
+  onRequestCreatePlan: () => void;
+  onRequestEditPlan: (plan: SchedulePlan) => void;
+  onDuplicatePlan: (planId: string) => void;
+  onDeletePlan: (planId: string) => void;
   onPrint: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
@@ -27,14 +31,149 @@ export const Navbar: React.FC<NavbarProps> = ({
   plans,
   activePlanId,
   onSelectPlan,
-  onAddPlan,
+  onRequestCreatePlan,
+  onRequestEditPlan,
+  onDuplicatePlan,
+  onDeletePlan,
   onPrint,
   isDarkMode,
   toggleDarkMode,
 }) => {
+  const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
+  const [isMobilePlanDropdownOpen, setIsMobilePlanDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsPlanDropdownOpen(false);
+      }
+      if (mobileDropdownRef.current && !mobileDropdownRef.current.contains(event.target as Node)) {
+        setIsMobilePlanDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const activePlan = plans.find(p => p.id === activePlanId) || plans[0];
+
+  const renderPlanList = (onItemClick: () => void) => (
+    <div 
+      className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-slate-200 dark:border-[#2a2b30] shadow-2xl p-2 z-50 animate-in zoom-in-95 duration-150 space-y-1"
+      dir="rtl"
+    >
+      <div className="px-3 py-2 border-b border-slate-100 dark:border-[#2a2b30] flex items-center justify-between">
+        <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+          سناریوهای انتخاب واحد ({toPersianDigits(plans.length)})
+        </span>
+      </div>
+
+      <div className="max-h-64 overflow-y-auto space-y-1 p-1">
+        {plans.map((p, idx) => {
+          const isSelected = p.id === activePlanId;
+          const isMain = idx === 0 || p.id === 'plan-1';
+
+          return (
+            <div
+              key={p.id}
+              onClick={() => {
+                onSelectPlan(p.id);
+                onItemClick();
+              }}
+              className={`group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-indigo-50 dark:bg-emerald-950/40 border border-indigo-200/80 dark:border-emerald-800/40 text-indigo-900 dark:text-emerald-300'
+                  : 'hover:bg-slate-100 dark:hover:bg-[#25262c] text-slate-800 dark:text-slate-200 border border-transparent'
+              }`}
+            >
+              <div className="flex items-start gap-2 min-w-0 flex-1 pr-1">
+                <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                  isSelected ? 'text-indigo-600 dark:text-emerald-400' : 'text-transparent'
+                }`}>
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold block break-words whitespace-normal leading-snug">
+                    {p.name}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block mt-0.5">
+                    {toPersianDigits(p.courses.length)} درس
+                  </span>
+                </div>
+              </div>
+
+              {/* Action buttons (Edit, Duplicate, Delete) */}
+              <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                {/* Edit Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRequestEditPlan(p);
+                    onItemClick();
+                  }}
+                  title="ویرایش نام سناریو"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Duplicate Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDuplicatePlan(p.id);
+                    onItemClick();
+                  }}
+                  title="تکثیر این سناریو (Duplicate)"
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Delete Button (Only for non-main plans) */}
+                {!isMain && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeletePlan(p.id);
+                      onItemClick();
+                    }}
+                    title="حذف این سناریو"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add New Plan Button */}
+      <div className="pt-2 border-t border-slate-100 dark:border-[#2a2b30]">
+        <button
+          type="button"
+          onClick={() => {
+            onRequestCreatePlan();
+            onItemClick();
+          }}
+          className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-50 dark:bg-emerald-950/30 hover:bg-indigo-100 dark:hover:bg-emerald-900/40 text-indigo-700 dark:text-emerald-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-indigo-100 dark:border-emerald-800/40"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>+ ایجاد سناریوی جدید</span>
+        </button>
+      </div>
+
+    </div>
+  );
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] w-full shadow-2xs transition-colors duration-200 print:hidden">
-      <div className="w-full px-3 xs:px-4 sm:px-6 h-15 flex items-center justify-between gap-1 xs:gap-2 sm:gap-4 overflow-hidden">
+      <div className="w-full px-3 xs:px-4 sm:px-6 h-15 flex items-center justify-between gap-1 xs:gap-2 sm:gap-4">
         
         {/* ZONE 1: BRAND TITLE */}
         <div className="flex items-center min-w-0 shrink">
@@ -90,30 +229,32 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* ZONE 3: ACTIONS (Plan selector, Theme, Print, Add Course) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           
-          {/* Plan / Scenario Switcher (Desktop only) */}
-          <div className="hidden sm:flex relative items-center bg-slate-100 dark:bg-[#1c1d21] rounded-xl p-0.5 border border-slate-200 dark:border-[#2a2b30] sm:max-w-[210px] shrink-0">
-            <span className="hidden xs:flex text-[11px] font-bold text-slate-500 dark:text-slate-400 pr-2 pl-1 items-center gap-1 shrink-0">
-              <Layers className="w-3 h-3 text-slate-400 dark:text-slate-500" />
-              سناریو:
-            </span>
-            <select
-              value={activePlanId}
-              onChange={(e) => {
-                if (e.target.value === '__add_new__') {
-                  onAddPlan();
-                } else {
-                  onSelectPlan(e.target.value);
-                }
-              }}
-              className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 px-1 py-1 focus:outline-none cursor-pointer truncate w-full"
+          {/* Plan / Scenario Switcher Dropdown (Desktop & Tablet) */}
+          <div className="hidden sm:block relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsPlanDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-1.5 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs max-w-[240px] text-right"
+              title="مدیریت و انتخاب سناریو"
             >
-              {plans.map((p) => (
-                <option key={p.id} value={p.id} className="dark:bg-[#1c1d21] dark:text-slate-200">
-                  {p.name} ({toPersianDigits(p.courses.length)} درس)
-                </option>
-              ))}
-              <option value="__add_new__" className="dark:bg-[#1c1d21] dark:text-[#00B87C]">+ سناریوی جدید</option>
-            </select>
+              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400 shrink-0" />
+              <div className="flex flex-col min-w-0 text-right flex-1">
+                <span className="text-[11px] sm:text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
+                  {activePlan?.name || 'برنامه اصلی'}
+                </span>
+                <span className="text-[9.5px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                  {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده
+                </span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isPlanDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu (Desktop) */}
+            {isPlanDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-72 z-50">
+                {renderPlanList(() => setIsPlanDropdownOpen(false))}
+              </div>
+            )}
           </div>
 
           {/* Theme Toggle */}
@@ -151,32 +292,33 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       </div>
 
-      {/* Mobile Plan Switcher (Visible only on very small screens < sm) */}
-      <div className="sm:hidden flex justify-center w-full px-3 pb-2.5">
-        <div className="relative flex items-center bg-slate-100 dark:bg-[#1c1d21] rounded-xl p-1 border border-slate-200 dark:border-[#2a2b30] w-full max-w-xs shrink-0">
-          <span className="flex text-[11px] font-bold text-slate-500 dark:text-slate-400 pr-2 pl-1 items-center gap-1 shrink-0">
-            <Layers className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            سناریو:
-          </span>
-          <select
-            value={activePlanId}
-            onChange={(e) => {
-              if (e.target.value === '__add_new__') {
-                onAddPlan();
-              } else {
-                onSelectPlan(e.target.value);
-              }
-            }}
-            className="bg-transparent text-[13px] font-bold text-slate-800 dark:text-slate-200 px-1 py-1 focus:outline-none cursor-pointer truncate w-full"
-          >
-            {plans.map((p) => (
-              <option key={p.id} value={p.id} className="dark:bg-[#1c1d21] dark:text-slate-200">
-                {p.name} ({toPersianDigits(p.courses.length)} درس)
-              </option>
-            ))}
-            <option value="__add_new__" className="dark:bg-[#1c1d21] dark:text-[#00B87C]">+ سناریوی جدید</option>
-          </select>
-        </div>
+      {/* Mobile Plan Dropdown Bar (Visible on screens < sm) */}
+      <div className="sm:hidden px-3 pb-2.5 relative" ref={mobileDropdownRef}>
+        <button
+          type="button"
+          onClick={() => setIsMobilePlanDropdownOpen(prev => !prev)}
+          className="w-full flex items-center justify-between bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-2 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs text-right"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Layers className="w-4 h-4 text-indigo-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex flex-col min-w-0 text-right flex-1">
+              <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
+                {activePlan?.name || 'برنامه اصلی'}
+              </span>
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده • لمس برای مشاهده سایر سناریوها
+              </span>
+            </div>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 mr-1 ${isMobilePlanDropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Mobile Dropdown Menu */}
+        {isMobilePlanDropdownOpen && (
+          <div className="absolute top-full left-3 right-3 mt-1.5 z-50">
+            {renderPlanList(() => setIsMobilePlanDropdownOpen(false))}
+          </div>
+        )}
       </div>
 
       {/* Sub-Nav Tab Bar for screens below lg breakpoint */}
@@ -215,7 +357,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'update' 
                 ? 'bg-white dark:bg-[#2a2b30] text-indigo-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-[#383a40]' 
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
+          }`}
           >
             <ArrowUpCircle className="w-3.5 h-3.5" />
             <span>به‌روزرسانی</span>

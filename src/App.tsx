@@ -7,16 +7,21 @@ import { HelpAndRules } from './components/HelpAndRules';
 import { SoftwareUpdateView } from './components/SoftwareUpdateView';
 import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
+import { PlanModal } from './components/PlanModal';
+import { AnnouncementModal } from './components/AnnouncementModal';
+import { LATEST_ANNOUNCEMENT } from './data/announcementData';
 import { Footer } from './components/Footer';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
+import { UniversityId } from './utils/parsers';
 import { CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
 const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
 const CATALOG_STORAGE_KEY = 'unischedule_catalog_courses';
 const STUDENT_INFO_KEY = 'unischedule_student_info';
+const DISMISSED_ANNOUNCEMENT_KEY = 'unischedule_dismissed_announcement_id';
 
 export default function App() {
   // Navigation
@@ -32,7 +37,7 @@ export default function App() {
       return [];
     }
   });
-  const [studentInfo, setStudentInfo] = useState<{ name?: string; id?: string } | null>(() => {
+  const [studentInfo, setStudentInfo] = useState<{ name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null>(() => {
     try {
       const saved = localStorage.getItem(STUDENT_INFO_KEY);
       return saved ? JSON.parse(saved) : null;
@@ -113,6 +118,32 @@ export default function App() {
   }, [isDarkMode]);
 
   // Modal states
+  // Announcement / Release Notes Modal State
+  const [isAnnouncementOpen, setIsAnnouncementOpen] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const dismissedId = localStorage.getItem(DISMISSED_ANNOUNCEMENT_KEY);
+        return dismissedId !== LATEST_ANNOUNCEMENT.id;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return true;
+  });
+
+  const handleCloseAnnouncement = (dontShowAgain: boolean) => {
+    setIsAnnouncementOpen(false);
+    try {
+      if (dontShowAgain) {
+        localStorage.setItem(DISMISSED_ANNOUNCEMENT_KEY, LATEST_ANNOUNCEMENT.id);
+      } else {
+        localStorage.removeItem(DISMISSED_ANNOUNCEMENT_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save announcement dismissal state to localStorage', e);
+    }
+  };
+
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -187,22 +218,129 @@ export default function App() {
     }
   };
 
-  // Handler: Add New Scenario Plan
-  const handleAddNewPlan = () => {
+  // Plan Modal state (Create / Edit)
+  const [planModalConfig, setPlanModalConfig] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'edit';
+    planToEdit?: SchedulePlan | null;
+    isMainPlan?: boolean;
+    defaultSuggestedName: string;
+  }>({
+    isOpen: false,
+    mode: 'create',
+    planToEdit: null,
+    isMainPlan: false,
+    defaultSuggestedName: '',
+  });
+
+  // Handler: Request Create Plan Modal
+  const handleRequestCreatePlan = () => {
     const planLetters = ['الف', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ی'];
     const nextIndex = plans.length;
     const letter = planLetters[nextIndex] || toPersianDigits(nextIndex + 1);
+    const defaultName = `سناریوی ${letter}`;
+
+    setPlanModalConfig({
+      isOpen: true,
+      mode: 'create',
+      planToEdit: null,
+      isMainPlan: false,
+      defaultSuggestedName: defaultName,
+    });
+  };
+
+  // Handler: Request Edit Plan Modal
+  const handleRequestEditPlan = (plan: SchedulePlan) => {
+    const isMain = plan.id === 'plan-1' || plans.indexOf(plan) === 0;
+    setPlanModalConfig({
+      isOpen: true,
+      mode: 'edit',
+      planToEdit: plan,
+      isMainPlan: isMain,
+      defaultSuggestedName: plan.name,
+    });
+  };
+
+  // Handler: Save Plan from Modal
+  const handleSavePlanFromModal = (name: string) => {
+    if (planModalConfig.mode === 'create') {
+      const newPlanId = `plan-${Date.now()}`;
+      const newPlan: SchedulePlan = {
+        id: newPlanId,
+        name,
+        courses: [],
+        createdAt: Date.now(),
+      };
+      setPlans([...plans, newPlan]);
+      setActivePlanId(newPlanId);
+      showToast(`سناریوی جدید «${name}» ایجاد شد.`, 'success');
+    } else if (planModalConfig.mode === 'edit' && planModalConfig.planToEdit) {
+      const targetId = planModalConfig.planToEdit.id;
+      const updatedPlans = plans.map((p) => (p.id === targetId ? { ...p, name } : p));
+      setPlans(updatedPlans);
+      showToast(`نام سناریو به «${name}» تغییر یافت.`, 'success');
+    }
+  };
+
+  // Handler: Duplicate Plan
+  const handleDuplicatePlan = (planId: string) => {
+    const target = plans.find((p) => p.id === planId);
+    if (!target) return;
+
     const newPlanId = `plan-${Date.now()}`;
-    const newPlan: SchedulePlan = {
+    let cloneName = `کپی ${target.name}`;
+    if (cloneName.length > 30) {
+      cloneName = cloneName.substring(0, 30);
+    }
+
+    const clonedCourses: Course[] = target.courses.map((c) => ({
+      ...c,
+      sessions: c.sessions.map((s) => ({ ...s })),
+      exam: c.exam ? { ...c.exam } : undefined,
+    }));
+
+    const clonedPlan: SchedulePlan = {
       id: newPlanId,
-      name: `سناریوی ${letter}`,
-      courses: [],
+      name: cloneName,
+      courses: clonedCourses,
       createdAt: Date.now(),
     };
 
-    setPlans([...plans, newPlan]);
+    setPlans([...plans, clonedPlan]);
     setActivePlanId(newPlanId);
-    showToast(`سناریوی جدید «${newPlan.name}» ایجاد شد.`, 'success');
+    showToast(`سناریوی «${cloneName}» با موفقیت تکثیر شد.`, 'success');
+  };
+
+  // Handler: Delete Plan
+  const handleDeletePlan = (planId: string) => {
+    if (planId === 'plan-1' || plans[0]?.id === planId) {
+      showToast('برنامه اصلی قابل حذف نیست.', 'error');
+      return;
+    }
+
+    const target = plans.find((p) => p.id === planId);
+    if (!target) return;
+
+    const performDelete = () => {
+      const remaining = plans.filter((p) => p.id !== planId);
+      setPlans(remaining);
+      if (activePlanId === planId) {
+        setActivePlanId(remaining[0]?.id || 'plan-1');
+      }
+      showToast(`سناریوی «${target.name}» حذف شد.`, 'success');
+    };
+
+    if (target.courses.length === 0) {
+      performDelete();
+    } else {
+      if (
+        window.confirm(
+          `این سناریو دارای ${toPersianDigits(target.courses.length)} درس است. آیا از حذف آن مطمئن هستید؟`
+        )
+      ) {
+        performDelete();
+      }
+    }
   };
 
   // Trigger Print
@@ -225,7 +363,10 @@ export default function App() {
         plans={plans}
         activePlanId={activePlan.id}
         onSelectPlan={(id) => setActivePlanId(id)}
-        onAddPlan={handleAddNewPlan}
+        onRequestCreatePlan={handleRequestCreatePlan}
+        onRequestEditPlan={handleRequestEditPlan}
+        onDuplicatePlan={handleDuplicatePlan}
+        onDeletePlan={handleDeletePlan}
         onPrint={handlePrint}
         isDarkMode={isDarkMode}
         toggleDarkMode={() => setIsDarkMode((prev) => !prev)}
@@ -252,10 +393,10 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black flex items-center gap-2">
-                    بانک دروس دانشگاه (گزارش ۲۱۲)
+                    بانک دروس ارائه شده دانشگاه
                     <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md leading-none font-bold">BETA</span>
                   </h2>
-                  <p className="text-xs sm:text-sm text-purple-100 mt-1 opacity-90">دروس خود را با یک کلیک از سامانه بهستان وارد کرده و از تداخل‌های کلاسی و امتحانی جلوگیری کنید.</p>
+                  <p className="text-xs sm:text-sm text-purple-100 mt-1 opacity-90">دروس خود را با یک کلیک از پورتال آموزشی دانشگاه وارد کرده و از تداخل‌های کلاسی و امتحانی جلوگیری کنید.</p>
                 </div>
               </div>
               <div className="relative shrink-0 w-full sm:w-auto bg-white/20 hover:bg-white/30 px-6 py-2.5 rounded-xl font-bold text-sm text-center transition-colors">
@@ -332,7 +473,7 @@ export default function App() {
         )}
 
         {/* Footer always visible on all tabs */}
-        <Footer />
+        <Footer onOpenAnnouncement={() => setIsAnnouncementOpen(true)} />
       </main>
 
       {/* Floating Add/Edit Course Modal */}
@@ -365,6 +506,30 @@ export default function App() {
           setStudentInfo={setStudentInfo}
         />
       )}
+
+      {/* Plan Modal (Create & Rename) */}
+      <PlanModal
+        isOpen={planModalConfig.isOpen}
+        onClose={() => setPlanModalConfig((prev) => ({ ...prev, isOpen: false }))}
+        mode={planModalConfig.mode}
+        planToEdit={planModalConfig.planToEdit}
+        isMainPlan={planModalConfig.isMainPlan}
+        defaultSuggestedName={planModalConfig.defaultSuggestedName}
+        onSave={handleSavePlanFromModal}
+      />
+
+            {/* Announcement / Release Notes Modal */}
+      <AnnouncementModal
+        isOpen={isAnnouncementOpen}
+        isDismissed={(() => {
+          try {
+            return localStorage.getItem(DISMISSED_ANNOUNCEMENT_KEY) === LATEST_ANNOUNCEMENT.id;
+          } catch {
+            return false;
+          }
+        })()}
+        onClose={handleCloseAnnouncement}
+      />
 
       {/* Toast Notification Notification */}
       {toastMessage && (
