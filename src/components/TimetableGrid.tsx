@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Course, DayOfWeek, ClassSession } from '../types/schedule';
 import { 
   Plus, Calendar, Clock, User, AlertTriangle, 
-  Trash2, Edit, X, Info
+  Trash2, Edit, X, Info 
 } from 'lucide-react';
 import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
 
@@ -367,13 +367,33 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               {selectedCourseCard.course.code && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">کد درس:</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">{selectedCourseCard.course.code}</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100" dir="ltr">
+                    {toPersianDigits(selectedCourseCard.course.code)}
+                  </span>
                 </div>
               )}
               {selectedCourseCard.course.instructor && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">استاد:</span>
                   <span className="font-bold text-slate-900 dark:text-slate-100">{selectedCourseCard.course.instructor}</span>
+                </div>
+              )}
+              {selectedCourseCard.course.faculty && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">دانشکده:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{selectedCourseCard.course.faculty}</span>
+                </div>
+              )}
+              {selectedCourseCard.course.gender && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">جنسیت اعضای شرکت‌کننده:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {selectedCourseCard.course.gender === 'mixed'
+                      ? 'مختلط'
+                      : selectedCourseCard.course.gender === 'men'
+                      ? 'آقایان'
+                      : 'بانوان'}
+                  </span>
                 </div>
               )}
               <div className="flex items-center justify-between">
@@ -398,9 +418,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                 onClick={() => {
                   const c = selectedCourseCard.course;
                   setSelectedCourseCard(null);
-                  if (confirm(`آیا از حذف درس «${c.name}» اطمینان دارید؟`)) {
-                    onDeleteCourse(c.id);
-                  }
+                  onDeleteCourse(c.id);
                 }}
                 className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
               >

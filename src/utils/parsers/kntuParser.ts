@@ -28,6 +28,18 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
     const credits = parseFloat(creditsStr) || 3;
     const capacityStr = normalizePersianText(cells[8]?.textContent || '');
     const capacity = parseInt(capacityStr, 10) || undefined;
+
+    // Gender from cells[11] (جنس: مختلط / زنانه / مردانه)
+    const genderRaw = normalizePersianText(cells[11]?.textContent || '');
+    let gender: 'mixed' | 'men' | 'women' | undefined = undefined;
+    if (genderRaw.includes('مختلط')) {
+      gender = 'mixed';
+    } else if (genderRaw.includes('مرد') || genderRaw.includes('آقا') || genderRaw.includes('مردانه')) {
+      gender = 'men';
+    } else if (genderRaw.includes('زن') || genderRaw.includes('بانو') || genderRaw.includes('زنانه')) {
+      gender = 'women';
+    }
+
     const instructor = normalizePersianText(cells[12]?.textContent || '');
 
     // Sessions from cells[13] (زمان و مکان ارائه)
@@ -99,6 +111,7 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
       department: department || undefined,
       capacity,
       location: detectedLocation || undefined,
+      gender,
       color: colorAssigner.getColor(codeGroup),
       sessions,
       exam,

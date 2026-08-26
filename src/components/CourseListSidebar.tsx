@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Course } from '../types/schedule';
 import { 
   BookOpen, Plus, Trash2, Edit, Clock, 
-  User, Calendar, Search
+  User, Calendar, Search, Building2 
 } from 'lucide-react';
 import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
+import { GenderBadge } from './GenderBadge';
 
 interface CourseListSidebarProps {
   courses: Course[];
@@ -131,6 +132,19 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
                     </div>
                   )}
 
+                  {/* Faculty & Gender Badges */}
+                  {(course.faculty || course.gender) && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {course.faculty && (
+                        <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded-md border border-purple-100 dark:border-purple-800/40 flex items-center gap-1 truncate max-w-[170px]" title={course.faculty}>
+                          <Building2 className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{course.faculty}</span>
+                        </span>
+                      )}
+                      <GenderBadge gender={course.gender} size="xs" />
+                    </div>
+                  )}
+
                   {/* Sessions list */}
                   <div className="text-[10.5px] text-slate-600 dark:text-slate-400 space-y-0.5 pt-1.5 mt-1 border-t border-slate-100 dark:border-[#2a2b30]/50">
                     {course.sessions.map((s, idx) => (
@@ -165,11 +179,7 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`آیا از حذف درس «${course.name}» اطمینان دارید؟`)) {
-                        onDeleteCourse(course.id);
-                      }
-                    }}
+                    onClick={() => onDeleteCourse(course.id)}
                     className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors"
                     title="حذف درس"
                   >
@@ -188,11 +198,7 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
           <button
             type="button"
-            onClick={() => {
-              if (confirm('آیا از پاک کردن تمامی دروس این برنامه اطمینان دارید؟')) {
-                onClearAll();
-              }
-            }}
+            onClick={onClearAll}
             className="text-rose-600 hover:text-rose-800 font-medium hover:underline flex items-center gap-1 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />

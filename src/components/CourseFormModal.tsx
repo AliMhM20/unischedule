@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Plus, Trash2, Calendar, Clock, AlertTriangle, CheckCircle2, 
-  User, BookOpen, Hash 
+  User, BookOpen, Hash, Users 
 } from 'lucide-react';
 import { Course, ClassSession, DayOfWeek, ExamInfo } from '../types/schedule';
 import { 
@@ -18,6 +18,7 @@ interface CourseFormModalProps {
   initialCourse?: Course | null;
   existingCourses: Course[];
   prefilledSlot?: { day: DayOfWeek; startTime: string; endTime: string } | null;
+  initialTab?: 'details' | 'sessions' | 'exam';
 }
 
 // Helper to generate time slots with 15-minute intervals
@@ -46,6 +47,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   initialCourse,
   existingCourses,
   prefilledSlot,
+  initialTab = 'details',
 }) => {
   const isEditing = !!initialCourse;
 
@@ -55,6 +57,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   const [instructor, setInstructor] = useState('');
   const [credits, setCredits] = useState<number>(3);
   const [color, setColor] = useState('blue');
+  const [gender, setGender] = useState<'mixed' | 'men' | 'women' | undefined>(undefined);
   const [notes, setNotes] = useState('');
 
   // Class sessions
@@ -79,6 +82,17 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   // Active sub-tab in modal
   const [activeTab, setActiveTab] = useState<'details' | 'sessions' | 'exam'>('details');
 
+  // Custom Time Validation Alert Dialog
+  const [timeAlert, setTimeAlert] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+
   // Initialize or reset form
   useEffect(() => {
     if (isOpen) {
@@ -88,6 +102,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         setInstructor(initialCourse.instructor || '');
         setCredits(initialCourse.credits);
         setColor(initialCourse.color);
+        setGender(initialCourse.gender || undefined);
         setNotes(initialCourse.notes || '');
         setSessions(
           initialCourse.sessions && initialCourse.sessions.length > 0
@@ -117,6 +132,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         setCredits(3);
         const randomColor = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)].id;
         setColor(randomColor);
+        setGender(undefined);
         setNotes('');
         setHasExam(true);
 
@@ -155,9 +171,9 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         setExamEndTime('10:30');
         setExamNotes('');
       }
-      setActiveTab('details');
+      setActiveTab(initialTab);
     }
-  }, [isOpen, initialCourse, prefilledSlot]);
+  }, [isOpen, initialCourse, prefilledSlot, initialTab]);
 
   // Construct current exam object
   const currentExamInfo: ExamInfo | undefined = useMemo(() => {
@@ -234,12 +250,62 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
     e.preventDefault();
 
     if (!name.trim()) {
-      alert('لطفاً نام درس را وارد کنید.');
+      setActiveTab('details');
+      setTimeAlert({
+        isOpen: true,
+        title: 'نام درس وارد نشده است',
+        message: 'لطفاً نام درس را در بخش مشخصات وارد کنید.',
+      });
       return;
     }
 
+    // Validate each class session time order
+    for (let i = 0; i < sessions.length; i++) {
+      const s = sessions[i];
+      const [startH, startM] = s.startTime.split(':').map(Number);
+      const [endH, endM] = s.endTime.split(':').map(Number);
+      const startTotal = startH * 60 + startM;
+      const endTotal = endH * 60 + endM;
+
+      if (endTotal <= startTotal) {
+        const dayConfig = DAYS_CONFIG.find((d) => d.id === s.day);
+        const dayName = dayConfig ? dayConfig.fa : s.day;
+        const sessionLabel = sessions.length > 1 ? `جلسه ${i === 0 ? 'اول' : 'دوم'} (${dayName})` : `جلسه روز ${dayName}`;
+
+        setActiveTab('sessions');
+        setTimeAlert({
+          isOpen: true,
+          title: 'ساعت نامعتبر برای جلسه کلاس',
+          message: `در ${sessionLabel}، ساعت پایان کلاس (${toPersianDigits(s.endTime)}) قبل از ساعت شروع (${toPersianDigits(s.startTime)}) یا دقیقاً برابر با آن قرار دارد.\n\nساعت پایان کلاس باید حتماً بعد از ساعت شروع باشد.`,
+        });
+        return;
+      }
+    }
+
+    // Validate exam time order if exam exists
+    if (hasExam) {
+      const [examStartH, examStartM] = examStartTime.split(':').map(Number);
+      const [examEndH, examEndM] = examEndTime.split(':').map(Number);
+      const examStartTotal = examStartH * 60 + examStartM;
+      const examEndTotal = examEndH * 60 + examEndM;
+
+      if (examEndTotal <= examStartTotal) {
+        setActiveTab('exam');
+        setTimeAlert({
+          isOpen: true,
+          title: 'ساعت نامعتبر برای امتحان پایان ترم',
+          message: `ساعت پایان امتحان (${toPersianDigits(examEndTime)}) قبل از ساعت شروع (${toPersianDigits(examStartTime)}) یا دقیقاً برابر با آن قرار دارد.\n\nساعت پایان امتحان باید حتماً بعد از ساعت شروع باشد.`,
+        });
+        return;
+      }
+    }
+
     if (validationResult.hasConflict) {
-      alert('این درس دارای تداخل زمانی با دروس دیگر است. لطفاً ابتدا تداخل را برطرف نمایید.');
+      setTimeAlert({
+        isOpen: true,
+        title: 'تداخل زمانی با برنامه فعلی',
+        message: 'این درس دارای تداخل زمانی با دروس دیگر برنامه است. لطفاً ابتدا تداخل را بررسی و برطرف نمایید.',
+      });
       return;
     }
 
@@ -250,6 +316,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
       instructor: instructor.trim() || undefined,
       credits: typeof credits === 'number' ? credits : 3,
       color,
+      gender: gender || undefined,
       sessions,
       exam: currentExamInfo,
       notes: notes.trim() || undefined,
@@ -370,10 +437,11 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    dir="ltr"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="مثال: 102-01"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
+                    placeholder="مثال: 2220116_21"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors text-right"
                   />
                 </div>
               </div>
@@ -423,6 +491,24 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Participant Gender (Optional) */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  <span>جنسیت اعضای شرکت کننده کلاس (اختیاری)</span>
+                </label>
+                <select
+                  value={gender || ''}
+                  onChange={(e) => setGender((e.target.value as 'mixed' | 'men' | 'women') || undefined)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm font-medium transition-colors cursor-pointer"
+                >
+                  <option value="">یکی از گزینه هارا انتخاب کنید</option>
+                  <option value="mixed">مختلط</option>
+                  <option value="men">آقایان</option>
+                  <option value="women">بانوان</option>
+                </select>
               </div>
 
               {/* Notes */}
@@ -508,45 +594,80 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   </div>
 
                   {/* Class Time Selector */}
-                  <div className="bg-white dark:bg-[#1c1d21] p-3.5 rounded-xl border border-slate-200 dark:border-[#2a2b30]">
-                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2.5 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-indigo-600 dark:text-emerald-500" />
-                      ساعت برگزاری کلاس:
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
-                        <select
-                          value={session.startTime}
-                          onChange={(e) => handleUpdateSession(index, 'startTime', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
-                        >
-                          {CLASS_START_HOURS.map((t) => (
-                            <option key={t} value={t}>
-                              {toPersianDigits(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  {(() => {
+                    const [startH, startM] = session.startTime.split(':').map(Number);
+                    const [endH, endM] = session.endTime.split(':').map(Number);
+                    const isInvalidSessionTime = (endH * 60 + endM) <= (startH * 60 + startM);
 
-                      <span className="text-slate-400 font-bold text-sm mt-5">تا</span>
+                    return (
+                      <div className={`p-3.5 rounded-xl border transition-all ${
+                        isInvalidSessionTime 
+                          ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800' 
+                          : 'bg-white dark:bg-[#1c1d21] border-slate-200 dark:border-[#2a2b30]'
+                      }`}>
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className={`w-4 h-4 ${isInvalidSessionTime ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-emerald-500'}`} />
+                            <span>ساعت برگزاری کلاس:</span>
+                          </div>
+                          {isInvalidSessionTime && (
+                            <span className="text-[11px] font-extrabold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              ساعت نامعتبر!
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
+                            <select
+                              value={session.startTime}
+                              onChange={(e) => handleUpdateSession(index, 'startTime', e.target.value)}
+                              className={`w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 ${
+                                isInvalidSessionTime
+                                  ? 'border-rose-400 dark:border-rose-700 focus:ring-rose-500'
+                                  : 'border-slate-300 dark:border-[#383a40] focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                              }`}
+                            >
+                              {CLASS_START_HOURS.map((t) => (
+                                <option key={t} value={t}>
+                                  {toPersianDigits(t)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                      <div className="flex-1">
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
-                        <select
-                          value={session.endTime}
-                          onChange={(e) => handleUpdateSession(index, 'endTime', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
-                        >
-                          {CLASS_END_HOURS.map((t) => (
-                            <option key={t} value={t}>
-                              {toPersianDigits(t)}
-                            </option>
-                          ))}
-                        </select>
+                          <span className="text-slate-400 font-bold text-sm mt-5">تا</span>
+
+                          <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
+                            <select
+                              value={session.endTime}
+                              onChange={(e) => handleUpdateSession(index, 'endTime', e.target.value)}
+                              className={`w-full px-3 py-2 bg-slate-50 dark:bg-[#131416] rounded-lg border text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 ${
+                                isInvalidSessionTime
+                                  ? 'border-rose-400 dark:border-rose-700 focus:ring-rose-500'
+                                  : 'border-slate-300 dark:border-[#383a40] focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                              }`}
+                            >
+                              {CLASS_END_HOURS.map((t) => (
+                                <option key={t} value={t}>
+                                  {toPersianDigits(t)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {isInvalidSessionTime && (
+                          <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-bold mt-2.5 pt-2 border-t border-rose-200 dark:border-rose-900/50">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>ساعت پایان ({toPersianDigits(session.endTime)}) باید بعد از ساعت شروع ({toPersianDigits(session.startTime)}) باشد.</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                 </div>
               ))}
@@ -598,40 +719,77 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
               </div>
 
               {/* Exam Time */}
-              <div className={`bg-slate-50 dark:bg-[#1c1d21]/50 p-4 rounded-xl border border-slate-200 dark:border-[#2a2b30] space-y-3 transition-opacity duration-200 ${!hasExam ? 'opacity-40 pointer-events-none' : ''}`}>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600 dark:text-emerald-500" />
-                  ساعت برگزاری امتحان:
-                </label>
+              {(() => {
+                const [examStartH, examStartM] = examStartTime.split(':').map(Number);
+                const [examEndH, examEndM] = examEndTime.split(':').map(Number);
+                const isInvalidExamTime = hasExam && (examEndH * 60 + examEndM) <= (examStartH * 60 + examStartM);
 
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
-                    <select
-                      value={examStartTime}
-                      onChange={(e) => setExamStartTime(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
-                    >
-                      {EXAM_START_HOURS.map((t) => (
-                        <option key={t} value={t}>{toPersianDigits(t)}</option>
-                      ))}
-                    </select>
+                return (
+                  <div className={`p-4 rounded-xl border space-y-3 transition-all ${
+                    !hasExam 
+                      ? 'opacity-40 pointer-events-none bg-slate-50 dark:bg-[#1c1d21]/50 border-slate-200 dark:border-[#2a2b30]' 
+                      : isInvalidExamTime
+                        ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                        : 'bg-slate-50 dark:bg-[#1c1d21]/50 border-slate-200 dark:border-[#2a2b30]'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Clock className={`w-4 h-4 ${isInvalidExamTime ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-emerald-500'}`} />
+                        <span>ساعت برگزاری امتحان:</span>
+                      </label>
+                      {isInvalidExamTime && (
+                        <span className="text-[11px] font-extrabold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-pulse">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          ساعت نامعتبر!
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت شروع:</span>
+                        <select
+                          value={examStartTime}
+                          onChange={(e) => setExamStartTime(e.target.value)}
+                          className={`w-full p-2 bg-white dark:bg-[#131416] rounded-lg border text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 ${
+                            isInvalidExamTime
+                              ? 'border-rose-400 dark:border-rose-700 focus:ring-rose-500'
+                              : 'border-slate-300 dark:border-[#383a40] focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                          }`}
+                        >
+                          {EXAM_START_HOURS.map((t) => (
+                            <option key={t} value={t}>{toPersianDigits(t)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-slate-400 font-bold text-sm mt-4">تا</span>
+                      <div className="flex-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
+                        <select
+                          value={examEndTime}
+                          onChange={(e) => setExamEndTime(e.target.value)}
+                          className={`w-full p-2 bg-white dark:bg-[#131416] rounded-lg border text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 ${
+                            isInvalidExamTime
+                              ? 'border-rose-400 dark:border-rose-700 focus:ring-rose-500'
+                              : 'border-slate-300 dark:border-[#383a40] focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                          }`}
+                        >
+                          {EXAM_END_HOURS.map((t) => (
+                            <option key={t} value={t}>{toPersianDigits(t)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {isInvalidExamTime && (
+                      <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-bold mt-2 pt-2 border-t border-rose-200 dark:border-rose-900/50">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>ساعت پایان امتحان ({toPersianDigits(examEndTime)}) باید بعد از ساعت شروع ({toPersianDigits(examStartTime)}) باشد.</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-slate-400 font-bold text-sm mt-4">تا</span>
-                  <div className="flex-1">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ساعت پایان:</span>
-                    <select
-                      value={examEndTime}
-                      onChange={(e) => setExamEndTime(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-[#131416] rounded-lg border border-slate-300 dark:border-[#383a40] text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
-                    >
-                      {EXAM_END_HOURS.map((t) => (
-                        <option key={t} value={t}>{toPersianDigits(t)}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Exam Notes */}
               <div className={`transition-opacity duration-200 ${!hasExam ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -721,6 +879,42 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         </form>
 
       </div>
+
+      {/* Custom Time/Validation Alert Dialog */}
+      {timeAlert.isOpen && (
+        <div 
+          className="fixed inset-0 z-70 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-150"
+          onClick={() => setTimeAlert({ isOpen: false, title: '', message: '' })}
+        >
+          <div 
+            className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-rose-200 dark:border-rose-900/50 shadow-2xl max-w-md w-full p-6 space-y-4 text-center transition-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center shadow-xs">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                {timeAlert.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line text-right bg-slate-50 dark:bg-[#131416] p-3.5 rounded-xl border border-slate-100 dark:border-[#2a2b30]">
+                {timeAlert.message}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setTimeAlert({ isOpen: false, title: '', message: '' })}
+                className="w-full py-2.5 px-4 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+              >
+                متوجه شدم
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

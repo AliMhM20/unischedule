@@ -3,11 +3,12 @@ import { Course } from '../types/schedule';
 import { 
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
-  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw
+  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw,
+  Clock, AlertTriangle, SlidersHorizontal
 } from 'lucide-react';
 import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity } from '../utils/parsers';
 import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
-import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme } from '../utils/timeUtils';
+import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme, isSameCourse, checkDuplicateGroupWarning } from '../utils/timeUtils';
 
 // AUT Help Photos
 import autImage1 from '../../assets/Help Photos/aut/image1.png';
@@ -22,11 +23,15 @@ import kntuImage3 from '../../assets/Help Photos/kntu/image3.png';
 import kntuImage4 from '../../assets/Help Photos/kntu/image4.png';
 import kntuImage5 from '../../assets/Help Photos/kntu/image5.png';
 
+import { GenderBadge } from './GenderBadge';
+import { ConfirmModal, ConfirmModalConfig } from './ConfirmModal';
+
 interface CourseCatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddCourse: (course) => void;
+  onAddCourse: (course: Course) => void;
   onRemoveCourse: (courseId: string) => void;
+  onReplaceCourse?: (courseToAdd: Course, conflictingCourseIds: string[]) => void;
   existingCourses: Course[];
   catalogCourses: Course[];
   setCatalogCourses: (courses: Course[]) => void;
@@ -41,19 +46,36 @@ const getCourseSignature = (c: Course): string => {
   const instructor = (c.instructor || '').trim();
   const credits = c.credits || 0;
   const faculty = (c.faculty || '').trim();
+  const gender = c.gender || 'unspecified';
   const sessions = (c.sessions || [])
     .map(s => `${s.day}:${s.startTime}-${s.endTime}`)
     .sort()
     .join('|');
   const exam = c.exam ? `${c.exam.date}:${c.exam.startTime}-${c.exam.endTime}` : 'no-exam';
-  return `${code}__${name}__${instructor}__${credits}__${faculty}__${sessions}__${exam}`;
+  return `${code}__${name}__${instructor}__${credits}__${faculty}__${gender}__${sessions}__${exam}`;
 };
+
+const generateTimeSlots = (startH: number, startM: number, endH: number, endM: number): string[] => {
+  const slots: string[] = [];
+  let currentMin = startH * 60 + startM;
+  const targetEndMin = endH * 60 + endM;
+  while (currentMin <= targetEndMin) {
+    const h = Math.floor(currentMin / 60);
+    const m = currentMin % 60;
+    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+    currentMin += 15;
+  }
+  return slots;
+};
+
+const TIME_FILTER_HOURS = generateTimeSlots(7, 0, 21, 0);
 
 export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   isOpen,
   onClose,
   onAddCourse,
   onRemoveCourse,
+  onReplaceCourse,
   existingCourses,
   catalogCourses,
   setCatalogCourses,
@@ -89,12 +111,27 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     selectedChoice: 'current' | 'incoming';
   } | null>(null);
 
+  // In-App Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalConfig | null>(null);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [examFilter, setExamFilter] = useState<'all' | 'has_exam' | 'no_exam'>('all');
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [selectedFaculty, setSelectedFaculty] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<'all' | 'mixed' | 'men' | 'women'>('all');
+
+  // Time Range Filter
+  const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false);
+  const [timeFilterStart, setTimeFilterStart] = useState<string>('07:00');
+  const [timeFilterEnd, setTimeFilterEnd] = useState<string>('20:00');
+  const [isTimeFilterActive, setIsTimeFilterActive] = useState<boolean>(false);
+  const [timeFilterError, setTimeFilterError] = useState<string | null>(null);
+
+  // Quick Checkboxes to hide conflicting and warning courses
+  const [hideConflictingCourses, setHideConflictingCourses] = useState(false);
+  const [hideWarningCourses, setHideWarningCourses] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +156,24 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const activeCount = useMemo(() => {
     return catalogCourses.filter(c => !c.isHidden).length;
   }, [catalogCourses]);
+
+  // Count conflicting & warning courses in current catalog for quick badges on the checkboxes
+  const conflictingCoursesCount = useMemo(() => {
+    return catalogCourses.filter(course => {
+      const matched = existingCourses.find(c => isSameCourse(course, c));
+      if (matched) return false;
+      const { hasConflict } = validateCourse(course, existingCourses);
+      return hasConflict;
+    }).length;
+  }, [catalogCourses, existingCourses]);
+
+  const warningCoursesCount = useMemo(() => {
+    return catalogCourses.filter(course => {
+      const matched = existingCourses.find(c => isSameCourse(course, c));
+      if (matched) return false;
+      return checkDuplicateGroupWarning(course, existingCourses);
+    }).length;
+  }, [catalogCourses, existingCourses]);
 
   // Extract unique faculties if present
   const availableFaculties = useMemo(() => {
@@ -236,7 +291,17 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
           setStoredSourcesCount(1);
         }).catch(e => console.warn('Could not store source', e));
 
-        setCatalogCourses(result.courses);
+        // Deduplicate parsed courses using getCourseSignature
+        const uniqueMap = new Map<string, Course>();
+        for (const c of result.courses) {
+          const sig = getCourseSignature(c);
+          if (!uniqueMap.has(sig)) {
+            uniqueMap.set(sig, c);
+          }
+        }
+        const deduplicatedCourses = Array.from(uniqueMap.values());
+
+        setCatalogCourses(deduplicatedCourses);
         setStudentInfo({
           name: result.studentName,
           id: result.studentId,
@@ -244,7 +309,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
           universityId: result.universityId
         });
 
-        setDetectedToast(`تعداد ${toPersianDigits(result.courses.length)} درس با موفقیت بارگذاری شد.`);
+        setDetectedToast(`تعداد ${toPersianDigits(deduplicatedCourses.length)} درس با موفقیت بارگذاری شد.`);
         setTimeout(() => setDetectedToast(null), 4000);
 
         setError(null);
@@ -392,25 +457,113 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       if (visibilityFilter === 'active' && course.isHidden) return false;
       if (visibilityFilter === 'hidden' && !course.isHidden) return false;
 
+      // Search query
       const matchesSearch = 
         course.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
         (course.code && course.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (course.instructor && course.instructor.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (course.faculty && course.faculty.toLowerCase().includes(searchQuery.toLowerCase()));
-      
+      if (!matchesSearch) return false;
+
+      // Gender filter
+      const matchesGender = genderFilter === 'all' || course.gender === genderFilter;
+      if (!matchesGender) return false;
+
+      // Day filter
       const matchesDay = selectedDay === 'all' || course.sessions.some(s => s.day === selectedDay);
-      
+      if (!matchesDay) return false;
+
+      // Exam filter
       const matchesExam = examFilter === 'all' || 
         (examFilter === 'has_exam' && course.exam) || 
         (examFilter === 'no_exam' && !course.exam);
+      if (!matchesExam) return false;
 
+      // Units filter
       const matchesUnits = unitFilter === 'all' || course.credits === parseInt(unitFilter, 10);
+      if (!matchesUnits) return false;
 
+      // Faculty filter
       const matchesFaculty = selectedFaculty === 'all' || course.faculty === selectedFaculty;
+      if (!matchesFaculty) return false;
 
-      return matchesSearch && matchesDay && matchesExam && matchesUnits && matchesFaculty;
+      // Time Range filter
+      if (isTimeFilterActive) {
+        if (!course.sessions || course.sessions.length === 0) return false;
+        const allSessionsInside = course.sessions.every(s => {
+          const sStart = (s.startTime || '').padStart(5, '0');
+          const sEnd = (s.endTime || '').padStart(5, '0');
+          return sStart >= timeFilterStart && sEnd <= timeFilterEnd;
+        });
+        if (!allSessionsInside) return false;
+      }
+
+      return true;
     });
-  }, [catalogCourses, visibilityFilter, searchQuery, selectedDay, examFilter, unitFilter, selectedFaculty]);
+  }, [
+    catalogCourses, 
+    visibilityFilter, 
+    searchQuery, 
+    selectedDay, 
+    examFilter, 
+    unitFilter, 
+    selectedFaculty,
+    genderFilter,
+    isTimeFilterActive,
+    timeFilterStart,
+    timeFilterEnd
+  ]);
+
+  // Checkbox Toggle Handlers to update isHidden
+  const handleToggleHideConflicting = (checked: boolean) => {
+    setHideConflictingCourses(checked);
+    setCatalogCourses(prev => prev.map(course => {
+      const matched = existingCourses.find(c => isSameCourse(course, c));
+      if (matched) return course;
+      const { hasConflict } = validateCourse(course, existingCourses);
+      if (hasConflict) {
+        return { ...course, isHidden: checked };
+      }
+      return course;
+    }));
+  };
+
+  const handleToggleHideWarnings = (checked: boolean) => {
+    setHideWarningCourses(checked);
+    setCatalogCourses(prev => prev.map(course => {
+      const matched = existingCourses.find(c => isSameCourse(course, c));
+      if (matched) return course;
+      const hasDuplicateWarning = checkDuplicateGroupWarning(course, existingCourses);
+      if (hasDuplicateWarning) {
+        return { ...course, isHidden: checked };
+      }
+      return course;
+    }));
+  };
+
+  // Synchronize isHidden when existingCourses change if checkboxes are active
+  useEffect(() => {
+    if (!hideConflictingCourses && !hideWarningCourses) return;
+
+    setCatalogCourses(prev => prev.map(course => {
+      const matched = existingCourses.find(c => isSameCourse(course, c));
+      if (matched) return course;
+
+      let shouldHide = course.isHidden;
+      if (hideConflictingCourses) {
+        const { hasConflict } = validateCourse(course, existingCourses);
+        if (hasConflict) shouldHide = true;
+      }
+      if (hideWarningCourses) {
+        const hasWarning = checkDuplicateGroupWarning(course, existingCourses);
+        if (hasWarning) shouldHide = true;
+      }
+      if (shouldHide !== course.isHidden) {
+        return { ...course, isHidden: shouldHide };
+      }
+      return course;
+    }));
+  }, [existingCourses, hideConflictingCourses, hideWarningCourses]);
 
   // Single Course Actions
   const handleToggleHideSingleCourse = (courseId: string) => {
@@ -426,16 +579,24 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const handleDeleteSingleCourse = (courseId: string) => {
     const target = catalogCourses.find(c => c.id === courseId);
     if (!target) return;
-    if (window.confirm(`آیا از حذف درس «${target.name}» از بانک دروس مطمئن هستید؟`)) {
-      setCatalogCourses(catalogCourses.filter(c => c.id !== courseId));
-      setSelectedCourseIds(prev => {
-        const next = new Set(prev);
-        next.delete(courseId);
-        return next;
-      });
-      setDetectedToast(`درس «${target.name}» از بانک دروس حذف شد.`);
-      setTimeout(() => setDetectedToast(null), 3000);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'حذف درس از بانک دروس',
+      message: `آیا از حذف درس «${target.name}» از بانک دروس اطمینان دارید؟`,
+      confirmText: 'حذف از بانک دروس',
+      cancelText: 'انصراف',
+      variant: 'danger',
+      onConfirm: () => {
+        setCatalogCourses(catalogCourses.filter(c => c.id !== courseId));
+        setSelectedCourseIds(prev => {
+          const next = new Set(prev);
+          next.delete(courseId);
+          return next;
+        });
+        setDetectedToast(`درس «${target.name}» از بانک دروس حذف شد.`);
+        setTimeout(() => setDetectedToast(null), 3000);
+      },
+    });
   };
 
   // Selection Handlers
@@ -497,13 +658,21 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const handleBatchDelete = () => {
     if (selectedCourseIds.size === 0) return;
     const count = selectedCourseIds.size;
-    if (window.confirm(`آیا از حذف ${toPersianDigits(count)} درس انتخاب‌شده از بانک دروس مطمئن هستید؟`)) {
-      const updated = catalogCourses.filter(c => !selectedCourseIds.has(c.id));
-      setCatalogCourses(updated);
-      setSelectedCourseIds(new Set());
-      setDetectedToast(`تعداد ${toPersianDigits(count)} درس از بانک دروس حذف شدند.`);
-      setTimeout(() => setDetectedToast(null), 3500);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'حذف گروهی دروس',
+      message: `آیا از حذف ${toPersianDigits(count)} درس انتخاب‌شده از بانک دروس اطمینان دارید؟`,
+      confirmText: 'بله، حذف کن',
+      cancelText: 'انصراف',
+      variant: 'danger',
+      onConfirm: () => {
+        const updated = catalogCourses.filter(c => !selectedCourseIds.has(c.id));
+        setCatalogCourses(updated);
+        setSelectedCourseIds(new Set());
+        setDetectedToast(`تعداد ${toPersianDigits(count)} درس از بانک دروس حذف شدند.`);
+        setTimeout(() => setDetectedToast(null), 3500);
+      },
+    });
   };
 
   // Confirm Identity Choice
@@ -970,11 +1139,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                 </div>
 
                 {/* Filter Controls Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2.5">
                   
                   {/* Search Box */}
                   <div className="relative sm:col-span-2">
-                    <div className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-slate-400">
+                    <div className={`absolute inset-y-0 right-3 flex items-center pointer-events-none transition-colors ${
+                      searchQuery.trim().length > 0
+                        ? 'text-indigo-600 dark:text-emerald-400'
+                        : 'text-slate-400'
+                    }`}>
                       <Search className="w-4 h-4" />
                     </div>
                     <input
@@ -982,8 +1155,22 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="جستجوی نام درس، کد درس، نام استاد یا دانشکده..."
-                      className="w-full h-10 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl pr-9 pl-3 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                      className={`w-full h-10 rounded-xl pr-9 pl-8 text-xs font-medium focus:outline-none transition-all ${
+                        searchQuery.trim().length > 0
+                          ? 'bg-indigo-50/60 dark:bg-emerald-950/30 border border-indigo-300 dark:border-emerald-600 text-indigo-950 dark:text-emerald-100 ring-2 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                          : 'bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                      }`}
                     />
+                    {searchQuery.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 left-2.5 flex items-center p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                        title="پاک کردن جستجو"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Visibility Filter (Active, Hidden, All) */}
@@ -991,15 +1178,39 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     <select
                       value={visibilityFilter}
                       onChange={(e) => setVisibilityFilter(e.target.value as any)}
-                      className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none focus:ring-2 ${
+                      className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
                         visibilityFilter === 'hidden'
-                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300'
-                          : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 ring-1 ring-amber-400/20 shadow-xs'
+                          : visibilityFilter === 'all'
+                            ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                            : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
                       }`}
                     >
-                      <option value="active">دروس فعال ({toPersianDigits(activeCount)})</option>
-                      <option value="hidden">پنهان‌شده‌ها ({toPersianDigits(hiddenCount)})</option>
-                      <option value="all">همه دروس ({toPersianDigits(catalogCourses.length)})</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="active">دروس فعال ({toPersianDigits(activeCount)})</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="hidden">پنهان‌شده‌ها ({toPersianDigits(hiddenCount)})</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">همه دروس ({toPersianDigits(catalogCourses.length)})</option>
+                    </select>
+                  </div>
+
+                  {/* Gender Filter */}
+                  <div>
+                    <select
+                      value={genderFilter}
+                      onChange={(e) => setGenderFilter(e.target.value as any)}
+                      className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
+                        genderFilter === 'men'
+                          ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-800 dark:text-blue-200 ring-1 ring-blue-500/20 shadow-xs'
+                          : genderFilter === 'women'
+                            ? 'bg-pink-50 dark:bg-pink-950/50 border-pink-400 dark:border-pink-600 text-pink-800 dark:text-pink-200 ring-1 ring-pink-500/20 shadow-xs'
+                            : genderFilter === 'mixed'
+                              ? 'bg-linear-to-r from-blue-50/90 via-purple-50/90 to-pink-50/90 dark:from-blue-950/60 dark:via-purple-950/60 dark:to-pink-950/60 border-purple-400 dark:border-purple-600 text-purple-900 dark:text-purple-200 ring-1 ring-purple-500/20 shadow-xs'
+                              : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                      }`}
+                    >
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">جنسیت (همه)</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="mixed">مختلط</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="men">آقایان</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="women">بانوان</option>
                     </select>
                   </div>
 
@@ -1009,11 +1220,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       <select
                         value={selectedFaculty}
                         onChange={(e) => setSelectedFaculty(e.target.value)}
-                        className="w-full h-10 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl px-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                        className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
+                          selectedFaculty !== 'all'
+                            ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200 ring-1 ring-purple-500/20 shadow-xs'
+                            : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                        }`}
                       >
-                        <option value="all">همه دانشکده‌ها ({toPersianDigits(availableFaculties.length)})</option>
+                        <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">همه دانشکده‌ها ({toPersianDigits(availableFaculties.length)})</option>
                         {availableFaculties.map((f, i) => (
-                          <option key={i} value={f}>{f}</option>
+                          <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" key={i} value={f}>{f}</option>
                         ))}
                       </select>
                     </div>
@@ -1024,16 +1239,20 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     <select
                       value={selectedDay}
                       onChange={(e) => setSelectedDay(e.target.value)}
-                      className="w-full h-10 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl px-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                      className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
+                        selectedDay !== 'all'
+                          ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                          : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                      }`}
                     >
-                      <option value="all">همه روزها</option>
-                      <option value="saturday">شنبه</option>
-                      <option value="sunday">یک‌شنبه</option>
-                      <option value="monday">دوشنبه</option>
-                      <option value="tuesday">سه‌شنبه</option>
-                      <option value="wednesday">چهارشنبه</option>
-                      <option value="thursday">پنج‌شنبه</option>
-                      <option value="friday">جمعه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">همه روزها</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="saturday">شنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="sunday">یک‌شنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="monday">دوشنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="tuesday">سه‌شنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="wednesday">چهارشنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="thursday">پنج‌شنبه</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="friday">جمعه</option>
                     </select>
                   </div>
 
@@ -1042,16 +1261,204 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     <select
                       value={unitFilter}
                       onChange={(e) => setUnitFilter(e.target.value)}
-                      className="w-full h-10 bg-slate-50 dark:bg-[#0b0c0e] border border-slate-200 dark:border-[#2a2b30] rounded-xl px-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                      className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
+                        unitFilter !== 'all'
+                          ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                          : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                      }`}
                     >
-                      <option value="all">تعداد واحد (همه)</option>
-                      <option value="1">۱ واحد</option>
-                      <option value="2">۲ واحد</option>
-                      <option value="3">۳ واحد</option>
-                      <option value="4">۴ واحد</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">تعداد واحد (همه)</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="1">۱ واحد</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="2">۲ واحد</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="3">۳ واحد</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="4">۴ واحد</option>
                     </select>
                   </div>
 
+                  {/* Time Range Filter Button with Popover */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsTimeFilterOpen(!isTimeFilterOpen)}
+                      className={`w-full h-10 px-3 rounded-xl text-xs font-bold flex items-center justify-between border transition-all cursor-pointer ${
+                        isTimeFilterActive
+                          ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 shadow-xs'
+                          : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Clock className={`w-3.5 h-3.5 shrink-0 ${isTimeFilterActive ? 'text-indigo-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                        <span className="truncate">
+                          {isTimeFilterActive 
+                            ? `${toPersianDigits(timeFilterStart)} تا ${toPersianDigits(timeFilterEnd)}` 
+                            : 'زمان کلاس'}
+                        </span>
+                      </div>
+                      {isTimeFilterActive ? (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsTimeFilterActive(false);
+                          }}
+                          className="p-0.5 hover:bg-indigo-200/60 dark:hover:bg-emerald-800/60 rounded-full text-indigo-700 dark:text-emerald-300"
+                          title="حذف فیلتر زمانی"
+                        >
+                          <X className="w-3 h-3" />
+                        </span>
+                      ) : (
+                        <SlidersHorizontal className="w-3 h-3 text-slate-400 shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Time Range Popover */}
+                    {isTimeFilterOpen && (
+                      <div className="absolute top-12 left-0 right-0 sm:right-auto sm:w-80 bg-white dark:bg-[#18191d] rounded-2xl shadow-xl border border-slate-200 dark:border-[#2a2b30] p-4 z-40 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#2a2b30]">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400" />
+                            فیلتر بر اساس بازه ساعت کلاس
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsTimeFilterOpen(false)}
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                          فقط دروسی نمایش داده می‌شوند که جلسات کلاسی آن‌ها درون این بازه زمانی برگزار شود:
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <span className="text-[10px] font-bold text-slate-400 block mb-1">از ساعت:</span>
+                            <select
+                              value={timeFilterStart}
+                              onChange={(e) => {
+                                setTimeFilterStart(e.target.value);
+                                setTimeFilterError(null);
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#131416] border border-slate-300 dark:border-[#383a40] rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                            >
+                              {TIME_FILTER_HOURS.map((t) => (
+                                <option key={t} value={t}>{toPersianDigits(t)}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <span className="text-slate-400 font-bold text-xs mt-4">تا</span>
+
+                          <div className="flex-1">
+                            <span className="text-[10px] font-bold text-slate-400 block mb-1">تا ساعت:</span>
+                            <select
+                              value={timeFilterEnd}
+                              onChange={(e) => {
+                                setTimeFilterEnd(e.target.value);
+                                setTimeFilterError(null);
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#131416] border border-slate-300 dark:border-[#383a40] rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-emerald-500"
+                            >
+                              {TIME_FILTER_HOURS.map((t) => (
+                                <option key={t} value={t}>{toPersianDigits(t)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {timeFilterError && (
+                          <div className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span>{timeFilterError}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const [startH, startM] = timeFilterStart.split(':').map(Number);
+                              const [endH, endM] = timeFilterEnd.split(':').map(Number);
+                              if (endH * 60 + endM <= startH * 60 + startM) {
+                                setTimeFilterError('ساعت پایان باید بعد از ساعت شروع باشد.');
+                                return;
+                              }
+                              setIsTimeFilterActive(true);
+                              setIsTimeFilterOpen(false);
+                              setTimeFilterError(null);
+                            }}
+                            className="flex-1 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          >
+                            اعمال بازه زمانی
+                          </button>
+                          {isTimeFilterActive && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsTimeFilterActive(false);
+                                setIsTimeFilterOpen(false);
+                                setTimeFilterError(null);
+                              }}
+                              className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              حذف
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Filter Checkbox Toggles (Hide Conflicting & Hide Warnings) */}
+                <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
+                  {/* Hide Conflicting Courses Checkbox */}
+                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    hideConflictingCourses
+                      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 shadow-xs'
+                      : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={hideConflictingCourses}
+                      onChange={(e) => handleToggleHideConflicting(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className={`w-3.5 h-3.5 ${hideConflictingCourses ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`} />
+                      <span className="font-bold">پنهان‌سازی دروس دارای تداخل زمانی</span>
+                      {conflictingCoursesCount > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-extrabold">
+                          {toPersianDigits(conflictingCoursesCount)}
+                        </span>
+                      )}
+                    </div>
+                  </label>
+
+                  {/* Hide Warning Courses Checkbox */}
+                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    hideWarningCourses
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 shadow-xs'
+                      : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={hideWarningCourses}
+                      onChange={(e) => handleToggleHideWarnings(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className={`w-3.5 h-3.5 ${hideWarningCourses ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`} />
+                      <span className="font-bold">پنهان‌سازی دروس دارای هشدار (گروه موازی)</span>
+                      {warningCoursesCount > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-extrabold">
+                          {toPersianDigits(warningCoursesCount)}
+                        </span>
+                      )}
+                    </div>
+                  </label>
                 </div>
 
                 {/* Batch Bar & Select All Header */}
@@ -1142,8 +1549,13 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {filteredCourses.map(course => {
-                      const isAdded = existingCourses.some(c => c.id === course.id);
-                      const { hasConflict, conflicts } = isAdded ? { hasConflict: false, conflicts: [] } : validateCourse(course, existingCourses);
+                      const matchedExistingCourse = existingCourses.find(c => isSameCourse(course, c));
+                      const isAdded = Boolean(matchedExistingCourse);
+                      const otherExistingCourses = matchedExistingCourse 
+                        ? existingCourses.filter(c => c.id !== matchedExistingCourse.id) 
+                        : existingCourses;
+                      const { hasConflict, conflicts } = isAdded ? { hasConflict: false, conflicts: [] } : validateCourse(course, otherExistingCourses);
+                      const hasDuplicateWarning = !isAdded && checkDuplicateGroupWarning(course, existingCourses);
                       const theme = getCourseTheme(course.color);
                       const isChecked = selectedCourseIds.has(course.id);
                       const isHidden = Boolean(course.isHidden);
@@ -1158,7 +1570,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                 ? 'border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs' 
                                 : hasConflict 
                                   ? 'border-rose-200 dark:border-rose-900/50 shadow-xs'
-                                  : 'border-slate-200 dark:border-[#2a2b30] shadow-xs'
+                                  : hasDuplicateWarning
+                                    ? 'border-amber-300 dark:border-amber-700/70 ring-2 ring-amber-400/20 shadow-xs'
+                                    : 'border-slate-200 dark:border-[#2a2b30] shadow-xs'
                           } ${isHidden ? 'opacity-70 dark:opacity-60 bg-slate-50/80 dark:bg-[#0f1013]' : ''}`}
                         >
                           <div className="p-4 sm:p-5 flex-1 space-y-3.5">
@@ -1211,6 +1625,17 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                       <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-100 dark:border-purple-800/40 flex items-center gap-1">
                                         <Building2 className="w-3 h-3" />
                                         <span>{course.faculty}</span>
+                                      </span>
+                                    )}
+
+                                    {/* Gender Badge */}
+                                    <GenderBadge gender={course.gender} />
+
+                                    {/* Parallel Group Warning Badge */}
+                                    {hasDuplicateWarning && !isAdded && (
+                                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/40 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                        <span>گروه موازی</span>
                                       </span>
                                     )}
 
@@ -1283,6 +1708,14 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                   </div>
                                 )}
                               </div>
+
+                              {/* Duplicate Group Warning Banner */}
+                              {hasDuplicateWarning && !isAdded && (
+                                <div className="p-2.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 animate-in fade-in">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>توجه: گروه دیگری از این درس در برنامه هفتگی شما ثبت شده است.</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           
@@ -1292,7 +1725,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                               ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30' 
                               : hasConflict 
                                 ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30' 
-                                : 'bg-slate-50/70 dark:bg-[#1c1d21]/50 border-slate-100 dark:border-[#2a2b30]'
+                                : hasDuplicateWarning
+                                  ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30'
+                                  : 'bg-slate-50/70 dark:bg-[#1c1d21]/50 border-slate-100 dark:border-[#2a2b30]'
                           }`}>
                             
                             {hasConflict && !isAdded && (
@@ -1322,7 +1757,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                               <div>
                                 {isAdded ? (
                                   <button
-                                    onClick={() => onRemoveCourse(course.id)}
+                                    onClick={() => onRemoveCourse(matchedExistingCourse ? matchedExistingCourse.id : course.id)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-xl transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1332,11 +1767,37 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                   <button
                                     onClick={() => {
                                       if (hasConflict) {
-                                        if (window.confirm('این درس با دروس موجود در برنامه هفتگی شما تداخل دارد. آیا مایلید دروس قبلی جایگزین این درس شوند؟')) {
-                                          const conflictingIds = Array.from(new Set(conflicts.map(c => c.existingCourse.id)));
-                                          conflictingIds.forEach(id => onRemoveCourse(id));
-                                          onAddCourse(course);
-                                        }
+                                        const conflictingIds = Array.from(new Set(conflicts.map(c => c.existingCourse.id)));
+                                        setConfirmModal({
+                                          isOpen: true,
+                                          title: 'جایگزینی دروس متداخل',
+                                          message: (
+                                            <div className="space-y-2.5">
+                                              <p className="leading-relaxed">
+                                                درس «{course.name}» با دروس موجود در برنامه شما تداخل دارد. آیا مایلید این درس جایگزین دروس متداخل قبلی شود؟
+                                              </p>
+                                              <div className="bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200 dark:border-rose-800/40 text-[11px] text-rose-800 dark:text-rose-300">
+                                                <span className="font-bold block mb-1">موارد تداخل:</span>
+                                                <ul className="list-disc list-inside space-y-0.5">
+                                                  {conflicts.map((c, i) => (
+                                                    <li key={i}>{c.reason}</li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            </div>
+                                          ),
+                                          confirmText: 'بله، جایگزین کن',
+                                          cancelText: 'انصراف',
+                                          variant: 'primary',
+                                          onConfirm: () => {
+                                            if (onReplaceCourse) {
+                                              onReplaceCourse(course, conflictingIds);
+                                            } else {
+                                              conflictingIds.forEach(id => onRemoveCourse(id));
+                                              onAddCourse(course);
+                                            }
+                                          },
+                                        });
                                       } else {
                                         onAddCourse(course);
                                       }
@@ -1495,6 +1956,12 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* In-App Confirm Modal for Catalog Actions */}
+      <ConfirmModal
+        config={confirmModal}
+        onClose={() => setConfirmModal(null)}
+      />
 
     </div>
   );

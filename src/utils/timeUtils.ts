@@ -189,3 +189,144 @@ export function validateCourse(
     conflicts: all,
   };
 }
+
+/**
+ * Normalizes Persian/Arabic characters, digits, ZWNJ, and whitespace for comparison
+ */
+export function normalizePersianComparison(str?: string): string {
+  if (!str) return '';
+  return str
+    .trim()
+    // Remove ZWNJ, directional marks, and invisible formatting characters
+    .replace(/[\u200c\u200b\u200e\u200f\ufeff]/g, '')
+    // Persian/Arabic character unifications
+    .replace(/[\u064a\u0649]/g, 'ی') // ي, ى -> ی
+    .replace(/[\u0643]/g, 'ک')       // ك -> ک
+    .replace(/[\u0629]/g, 'ه')       // ة -> ه
+    .replace(/[\u0622\u0623\u0625]/g, 'ا') // آ, أ, إ -> ا
+    // Persian/Arabic digits to English digits
+    .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1728))
+    .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1584))
+    // Replace multiple spaces and punctuation like underscores/dashes with single space
+    .replace(/[\s_—\-]+/g, ' ')
+    .toLowerCase();
+}
+
+/**
+ * Normalizes course code (e.g. "2220116_21", "2220116-21", "۲۲۲۰۱۱۶_۲۱")
+ */
+export function normalizeCourseCode(code?: string): string {
+  if (!code) return '';
+  return code
+    .trim()
+    // Persian/Arabic digits to English
+    .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1728))
+    .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1584))
+    // Normalize dashes and underscores
+    .replace(/[\s\-_]+/g, '_')
+    .toLowerCase();
+}
+
+/**
+ * Generates an order-independent signature of class sessions
+ */
+export function getSessionsNormalizedSignature(sessions?: ClassSession[]): string {
+  if (!sessions || sessions.length === 0) return '';
+  return sessions
+    .map((s) => {
+      const day = (s.day || '').toLowerCase().trim();
+      const start = (s.startTime || '').padStart(5, '0');
+      const end = (s.endTime || '').padStart(5, '0');
+      return `${day}:${start}-${end}`;
+    })
+    .sort()
+    .join('|');
+}
+
+/**
+ * Checks whether a course from the catalog and an existing plan course are identical
+ */
+export function isSameCourse(courseA?: Course | null, courseB?: Course | null): boolean {
+  if (!courseA || !courseB) return false;
+
+  // 1. Direct ID match
+  if (courseA.id && courseB.id && courseA.id === courseB.id) {
+    return true;
+  }
+
+  // 2. Normalized sessions comparison
+  const s1 = getSessionsNormalizedSignature(courseA.sessions);
+  const s2 = getSessionsNormalizedSignature(courseB.sessions);
+
+  // Both must match on session times
+  if (s1 !== s2) {
+    return false;
+  }
+
+  // 3. Name comparison
+  const name1 = normalizePersianComparison(courseA.name);
+  const name2 = normalizePersianComparison(courseB.name);
+  if (!name1 || !name2) return false;
+
+  // Check name match with flexibility for "ریاضی" vs "ریاضیات" or exact match
+  const cleanName1 = name1.replace(/ات(?:\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  const cleanName2 = name2.replace(/ات(?:\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  const nameMatches = name1 === name2 || cleanName1 === cleanName2;
+
+  if (!nameMatches) {
+    return false;
+  }
+
+  // 4. Code comparison (if both have non-empty codes)
+  const code1 = normalizeCourseCode(courseA.code);
+  const code2 = normalizeCourseCode(courseB.code);
+  if (code1 && code2) {
+    if (code1 !== code2) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Extracts the base course code before group delimiter (e.g. "1022391_01" -> "1022391")
+ */
+export function getCourseBaseCode(code?: string): string {
+  if (!code) return '';
+  const normalized = normalizeCourseCode(code);
+  return normalized.split('_')[0].trim();
+}
+
+/**
+ * Checks if another group of the same subject is already present in the active plan
+ */
+export function checkDuplicateGroupWarning(catalogCourse: Course, planCourses: Course[]): boolean {
+  if (!catalogCourse || !planCourses || planCourses.length === 0) return false;
+
+  // If this exact course is already added in plan, it's not a duplicate group warning
+  if (planCourses.some((p) => isSameCourse(catalogCourse, p))) {
+    return false;
+  }
+
+  const catalogBaseCode = getCourseBaseCode(catalogCourse.code);
+  const catalogName = normalizePersianComparison(catalogCourse.name);
+  const cleanCatalogName = catalogName.replace(/ات(?:\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+
+  return planCourses.some((planCourse) => {
+    const planBaseCode = getCourseBaseCode(planCourse.code);
+    const planName = normalizePersianComparison(planCourse.name);
+    const cleanPlanName = planName.replace(/ات(?:\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const nameMatches = catalogName === planName || cleanCatalogName === cleanPlanName;
+
+    // If both have base codes, both base code and name must match
+    if (catalogBaseCode && planBaseCode) {
+      return catalogBaseCode === planBaseCode && nameMatches;
+    }
+
+    // If one or both lack a code, name matching indicates another group/duplicate subject
+    return nameMatches;
+  });
+}
+

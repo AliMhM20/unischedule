@@ -33,6 +33,18 @@ export function parseAutBehestan(htmlContent: string): ParsedCatalog {
     const credits = parseFloat(creditsStr) || 3;
     const capacityStr = normalizePersianText(cells[7]?.textContent || '');
     const capacity = parseInt(capacityStr, 10) || undefined;
+
+    // Gender from cells[8] (جنسیت: مختلط / زن / مرد)
+    const genderRaw = normalizePersianText(cells[8]?.textContent || '');
+    let gender: 'mixed' | 'men' | 'women' | undefined = undefined;
+    if (genderRaw.includes('مختلط')) {
+      gender = 'mixed';
+    } else if (genderRaw.includes('مرد') || genderRaw.includes('آقا') || genderRaw.includes('مردانه')) {
+      gender = 'men';
+    } else if (genderRaw.includes('زن') || genderRaw.includes('بانو') || genderRaw.includes('زنانه')) {
+      gender = 'women';
+    }
+
     const instructor = normalizePersianText(cells[9]?.textContent || '');
 
     // td[10]: ساعات ارائه و امتحان ترکیبی
@@ -88,6 +100,7 @@ export function parseAutBehestan(htmlContent: string): ParsedCatalog {
       instructor,
       credits,
       capacity,
+      gender,
       color: colorAssigner.getColor(codeGroup),
       sessions,
       exam,

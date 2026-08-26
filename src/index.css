@@ -33,3 +33,15 @@
     color: black !important;
   }
 }
+
+select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.dark select option,
+:is(.dark select option) {
+  background-color: #18191d;
+  color: #f8fafc;
+}
+

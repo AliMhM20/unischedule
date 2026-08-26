@@ -36,6 +36,7 @@ export interface Course {
   department?: string;
   capacity?: number;
   location?: string;
+  gender?: 'mixed' | 'men' | 'women';
   isHidden?: boolean;
   createdAt: number;
 }

@@ -9,6 +9,7 @@ import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
 import { PlanModal } from './components/PlanModal';
 import { AnnouncementModal } from './components/AnnouncementModal';
+import { ConfirmModal, ConfirmModalConfig } from './components/ConfirmModal';
 import { LATEST_ANNOUNCEMENT } from './data/announcementData';
 import { Footer } from './components/Footer';
 import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
@@ -145,6 +146,7 @@ export default function App() {
   };
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [formModalTab, setFormModalTab] = useState<'details' | 'sessions' | 'exam'>('details');
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [prefilledSlot, setPrefilledSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
@@ -173,21 +175,21 @@ export default function App() {
 
   // Handler: Save (Add or Update) Course
   const handleSaveCourse = (course: Course) => {
-    const isExisting = activePlan.courses.some((c) => c.id === course.id);
-    let updatedCourses: Course[];
-
-    if (isExisting) {
-      updatedCourses = activePlan.courses.map((c) => (c.id === course.id ? course : c));
-      showToast(`درس «${course.name}» به‌روزرسانی شد.`, 'success');
-    } else {
-      updatedCourses = [...activePlan.courses, course];
-      showToast(`درس «${course.name}» به برنامه اضافه شد.`, 'success');
-    }
-
-    const updatedPlans = plans.map((p) =>
-      p.id === activePlan.id ? { ...p, courses: updatedCourses } : p
+    let isExisting = false;
+    setPlans((prevPlans) => {
+      return prevPlans.map((p) => {
+        if (p.id !== activePlanId) return p;
+        isExisting = p.courses.some((c) => c.id === course.id);
+        const updatedCourses = isExisting
+          ? p.courses.map((c) => (c.id === course.id ? course : c))
+          : [...p.courses, course];
+        return { ...p, courses: updatedCourses };
+      });
+    });
+    showToast(
+      isExisting ? `درس «${course.name}» به‌روزرسانی شد.` : `درس «${course.name}» به برنامه اضافه شد.`,
+      'success'
     );
-    setPlans(updatedPlans);
     setIsFormModalOpen(false);
     setEditingCourse(null);
     setPrefilledSlot(null);
@@ -195,27 +197,70 @@ export default function App() {
 
   // Handler: Delete Course
   const handleDeleteCourse = (courseId: string) => {
-    const courseToDelete = activePlan.courses.find((c) => c.id === courseId);
-    const updatedCourses = activePlan.courses.filter((c) => c.id !== courseId);
-    const updatedPlans = plans.map((p) =>
-      p.id === activePlan.id ? { ...p, courses: updatedCourses } : p
-    );
-    setPlans(updatedPlans);
-    if (courseToDelete) {
-      showToast(`درس «${courseToDelete.name}» حذف شد.`, 'success');
+    let courseToDeleteName = '';
+    setPlans((prevPlans) => {
+      return prevPlans.map((p) => {
+        if (p.id !== activePlanId) return p;
+        const target = p.courses.find((c) => c.id === courseId);
+        if (target) courseToDeleteName = target.name;
+        return { ...p, courses: p.courses.filter((c) => c.id !== courseId) };
+      });
+    });
+    if (courseToDeleteName) {
+      showToast(`درس «${courseToDeleteName}» حذف شد.`, 'success');
     }
   };
 
-  // Handler: Clear All Courses
+  // Handler: Replace Conflicting Courses with a New Course (Atomic Operation)
+  const handleReplaceCourses = (courseToAdd: Course, conflictingCourseIds: string[]) => {
+    setPlans((prevPlans) => {
+      return prevPlans.map((p) => {
+        if (p.id !== activePlanId) return p;
+        const remainingCourses = p.courses.filter((c) => !conflictingCourseIds.includes(c.id));
+        const updatedCourses = [...remainingCourses.filter((c) => c.id !== courseToAdd.id), courseToAdd];
+        return { ...p, courses: updatedCourses };
+      });
+    });
+    showToast(`درس «${courseToAdd.name}» جایگزین دروس متداخل شد.`, 'success');
+  };
+
+  // Global In-App Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalConfig | null>(null);
+
+  // Handler: Prompt Delete Course with In-App Confirm Modal
+  const handlePromptDeleteCourse = (courseId: string) => {
+    const course = activePlan.courses.find((c) => c.id === courseId);
+    if (!course) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'حذف درس از برنامه',
+      message: `آیا از حذف درس «${course.name}» از برنامه هفتگی خود اطمینان دارید؟`,
+      confirmText: 'حذف درس',
+      cancelText: 'انصراف',
+      variant: 'danger',
+      onConfirm: () => {
+        handleDeleteCourse(courseId);
+      },
+    });
+  };
+
+  // Handler: Clear All Courses with In-App Confirm Modal
   const handleClearAllCourses = () => {
     if (activePlan.courses.length === 0) return;
-    if (window.confirm('آیا مطمئن هستید که می‌خواهید همه دروس این برنامه را حذف کنید؟')) {
-      const updatedPlans = plans.map((p) =>
-        p.id === activePlan.id ? { ...p, courses: [] } : p
-      );
-      setPlans(updatedPlans);
-      showToast('تمام دروس برنامه حذف شدند.', 'success');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'پاکسازی تمام دروس برنامه',
+      message: `آیا از حذف تمامی ${toPersianDigits(activePlan.courses.length)} درس ثبت‌شده در «${activePlan.name}» اطمینان دارید؟ این عمل غیرقابل بازگشت است.`,
+      confirmText: 'بله، همه را پاک کن',
+      cancelText: 'انصراف',
+      variant: 'danger',
+      onConfirm: () => {
+        setPlans((prevPlans) =>
+          prevPlans.map((p) => (p.id === activePlanId ? { ...p, courses: [] } : p))
+        );
+        showToast('تمام دروس برنامه حذف شدند.', 'success');
+      },
+    });
   };
 
   // Plan Modal state (Create / Edit)
@@ -333,13 +378,15 @@ export default function App() {
     if (target.courses.length === 0) {
       performDelete();
     } else {
-      if (
-        window.confirm(
-          `این سناریو دارای ${toPersianDigits(target.courses.length)} درس است. آیا از حذف آن مطمئن هستید؟`
-        )
-      ) {
-        performDelete();
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: 'حذف سناریو برنامه',
+        message: `سناریوی «${target.name}» دارای ${toPersianDigits(target.courses.length)} درس ثبت‌شده است. آیا از حذف آن اطمینان دارید؟`,
+        confirmText: 'حذف سناریو',
+        cancelText: 'انصراف',
+        variant: 'danger',
+        onConfirm: performDelete,
+      });
     }
   };
 
@@ -411,14 +458,16 @@ export default function App() {
                 onAddCourse={() => {
                   setEditingCourse(null);
                   setPrefilledSlot(null);
+                  setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
                 onEditCourse={(course) => {
                   setEditingCourse(course);
                   setPrefilledSlot(null);
+                  setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
-                onDeleteCourse={handleDeleteCourse}
+                onDeleteCourse={handlePromptDeleteCourse}
                 onClearAll={handleClearAllCourses}
               />
             </div>
@@ -430,12 +479,14 @@ export default function App() {
                 onEditCourse={(course) => {
                   setEditingCourse(course);
                   setPrefilledSlot(null);
+                  setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
-                onDeleteCourse={handleDeleteCourse}
+                onDeleteCourse={handlePromptDeleteCourse}
                 onAddCourseAtSlot={(day, startTime, endTime) => {
                   setEditingCourse(null);
                   setPrefilledSlot({ day, startTime, endTime });
+                  setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
                 showFriday={showFriday}
@@ -450,6 +501,13 @@ export default function App() {
                 onEditCourse={(course) => {
                   setEditingCourse(course);
                   setPrefilledSlot(null);
+                  setFormModalTab('exam');
+                  setIsFormModalOpen(true);
+                }}
+                onOpenAddModal={() => {
+                  setEditingCourse(null);
+                  setPrefilledSlot(null);
+                  setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
               />
@@ -484,11 +542,13 @@ export default function App() {
             setIsFormModalOpen(false);
             setEditingCourse(null);
             setPrefilledSlot(null);
+            setFormModalTab('details');
           }}
           onSave={handleSaveCourse}
           initialCourse={editingCourse}
           prefilledSlot={prefilledSlot}
           existingCourses={activePlan.courses}
+          initialTab={formModalTab}
         />
       )}
 
@@ -499,6 +559,7 @@ export default function App() {
           onClose={() => setIsCatalogModalOpen(false)}
           onAddCourse={handleSaveCourse}
           onRemoveCourse={handleDeleteCourse}
+          onReplaceCourse={handleReplaceCourses}
           existingCourses={activePlan.courses}
           catalogCourses={catalogCourses}
           setCatalogCourses={setCatalogCourses}
@@ -531,7 +592,13 @@ export default function App() {
         onClose={handleCloseAnnouncement}
       />
 
-      {/* Toast Notification Notification */}
+      {/* Global In-App Confirm Modal */}
+      <ConfirmModal
+        config={confirmModal}
+        onClose={() => setConfirmModal(null)}
+      />
+
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 left-5 z-50 animate-in slide-in-from-bottom-3 duration-200">
           <div
