@@ -36,13 +36,38 @@ const parserRegistry: Record<UniversityId, ParserFunction> = {
 export function detectUniversity(htmlContent: string): UniversityId | null {
   const lower = htmlContent.toLowerCase();
 
-  // KNTU keywords
-  if (lower.includes('خواجه') || lower.includes('نصیر') || lower.includes('kntu') || lower.includes('دانشكده درس') || lower.includes('دانشکده درس') || lower.includes('مخصوص ورودي')) {
+  // Distinctive KNTU (Report 102) indicators
+  const isKntu = 
+    lower.includes('دانشكده درس') || 
+    lower.includes('دانشکده درس') || 
+    lower.includes('مخصوص ورودي') || 
+    lower.includes('مخصوص ورودی') || 
+    lower.includes('خواجه نصیر') || 
+    lower.includes('خواجه نصير') || 
+    lower.includes('kntu.ac.ir') || 
+    lower.includes('kntu');
+
+  // Distinctive AUT (Report 212) indicators
+  const isAut = 
+    lower.includes('شماره دانشجو') || 
+    lower.includes('پيش نياز، همنياز') || 
+    lower.includes('پیش نیاز، همنیاز') || 
+    lower.includes('اميركبير') || 
+    lower.includes('امیرکبیر') || 
+    lower.includes('aut.ac.ir') ||
+    lower.includes('گزارش ۲۱۲') ||
+    lower.includes('گزارش 212');
+
+  // If AUT indicators are present (even if a professor name contains "خواجه"), prioritize AUT
+  if (isAut && !lower.includes('دانشكده درس') && !lower.includes('دانشکده درس') && !lower.includes('مخصوص ورودي') && !lower.includes('مخصوص ورودی')) {
+    return 'aut';
+  }
+
+  if (isKntu) {
     return 'kntu';
   }
 
-  // AUT keywords
-  if (lower.includes('اميركبير') || lower.includes('امیرکبیر') || lower.includes('aut.ac.ir') || lower.includes('پيش نياز، همنياز') || lower.includes('شماره دانشجو')) {
+  if (isAut) {
     return 'aut';
   }
 
