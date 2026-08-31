@@ -1,6 +1,6 @@
 import { Course } from '../../types/schedule';
 
-export type UniversityId = 'aut' | 'kntu';
+export type UniversityId = 'aut' | 'kntu' | 'iut' | 'nit';
 
 export interface UniversityInfo {
   id: UniversityId;

@@ -101,6 +101,9 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
       }
     }
 
+    // Remarks/Notes from the last cell (توضیحات)
+    const remarks = cells.length >= 20 ? normalizePersianText(cells[cells.length - 1]?.textContent || '') : undefined;
+
     courses.push({
       id: `course_${codeGroup}`,
       code: codeGroup,
@@ -113,6 +116,7 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
       location: detectedLocation || undefined,
       gender,
       color: colorAssigner.getColor(codeGroup),
+      notes: remarks || undefined,
       sessions,
       exam,
       createdAt: Date.now()

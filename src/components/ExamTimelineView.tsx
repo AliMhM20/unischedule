@@ -7,12 +7,14 @@ interface ExamTimelineViewProps {
   courses: Course[];
   onEditCourse: (course: Course) => void;
   onOpenAddModal: () => void;
+  isPreviewMode?: boolean;
 }
 
 export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
   courses,
   onEditCourse,
   onOpenAddModal,
+  isPreviewMode = false,
 }) => {
   // Filter and sort courses by exam date and start time
   const sortedExams = useMemo(() => {
@@ -126,13 +128,15 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
               با افزودن دروس خود به برنامه، تقویم امتحانات به صورت خودکار ایجاد و کنترل تداخل انجام می‌شود.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="px-4 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer print:hidden"
-          >
-            + افزودن اولین درس
-          </button>
+          {!isPreviewMode && (
+            <button
+              type="button"
+              onClick={onOpenAddModal}
+              className="px-4 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer print:hidden"
+            >
+              + افزودن اولین درس
+            </button>
+          )}
         </div>
       ) : (
         /* Exam Cards Grid */
@@ -198,16 +202,18 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                 </div>
 
                 {/* Footer Action */}
-                <div className="pt-2 border-t border-slate-100 dark:border-[#2a2b30] flex justify-end print:hidden">
-                  <button
-                    type="button"
-                    onClick={() => onEditCourse(course)}
-                    className="text-xs font-bold text-indigo-600 dark:text-emerald-400 hover:text-indigo-800 dark:hover:text-emerald-300 flex items-center gap-1 hover:underline cursor-pointer"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    ویرایش زمان امتحان
-                  </button>
-                </div>
+                {!isPreviewMode && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-[#2a2b30] flex justify-end print:hidden">
+                    <button
+                      type="button"
+                      onClick={() => onEditCourse(course)}
+                      className="text-xs font-bold text-indigo-600 dark:text-emerald-400 hover:text-indigo-800 dark:hover:text-emerald-300 flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      ویرایش زمان امتحان
+                    </button>
+                  </div>
+                )}
 
               </div>
             );

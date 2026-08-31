@@ -93,6 +93,9 @@ export function parseAutBehestan(htmlContent: string): ParsedCatalog {
       }
     }
 
+    // Remarks/Notes from the last cell if available (توضیحات)
+    const remarks = cells.length > 11 ? normalizePersianText(cells[cells.length - 1]?.textContent || '') : undefined;
+
     courses.push({
       id: `course_${codeGroup}`,
       code: codeGroup,
@@ -102,6 +105,7 @@ export function parseAutBehestan(htmlContent: string): ParsedCatalog {
       capacity,
       gender,
       color: colorAssigner.getColor(codeGroup),
+      notes: remarks || undefined,
       sessions,
       exam,
       createdAt: Date.now()

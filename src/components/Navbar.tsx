@@ -3,7 +3,7 @@ import {
   LayoutGrid, Plus, Printer, 
   HelpCircle, Layers, Moon, Sun,
   ArrowUpCircle, ChevronDown, Check,
-  Pencil, Copy, Trash2, PlusCircle
+  Pencil, Copy, Trash2, PlusCircle, Share2
 } from 'lucide-react';
 import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
@@ -19,9 +19,11 @@ interface NavbarProps {
   onRequestEditPlan: (plan: SchedulePlan) => void;
   onDuplicatePlan: (planId: string) => void;
   onDeletePlan: (planId: string) => void;
+  onSharePlan?: (plan: SchedulePlan) => void;
   onPrint: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  isPreviewMode?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -35,9 +37,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRequestEditPlan,
   onDuplicatePlan,
   onDeletePlan,
+  onSharePlan,
   onPrint,
   isDarkMode,
   toggleDarkMode,
+  isPreviewMode = false,
 }) => {
   const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
   const [isMobilePlanDropdownOpen, setIsMobilePlanDropdownOpen] = useState(false);
@@ -118,6 +122,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
                 >
                   <Pencil className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Share Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSharePlan?.(p);
+                    onItemClick();
+                  }}
+                  title="اشتراک‌گذاری این سناریو با لینک مستقیم"
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
                 </button>
 
                 {/* Duplicate Button */}
@@ -230,32 +247,34 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           
           {/* Plan / Scenario Switcher Dropdown (Desktop & Tablet) */}
-          <div className="hidden sm:block relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsPlanDropdownOpen(prev => !prev)}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-1.5 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs max-w-[240px] text-right"
-              title="مدیریت و انتخاب سناریو"
-            >
-              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400 shrink-0" />
-              <div className="flex flex-col min-w-0 text-right flex-1">
-                <span className="text-[11px] sm:text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
-                  {activePlan?.name || 'برنامه اصلی'}
-                </span>
-                <span className="text-[9.5px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-                  {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده
-                </span>
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isPlanDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
+          {!isPreviewMode && (
+            <div className="hidden sm:block relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsPlanDropdownOpen(prev => !prev)}
+                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-1.5 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs max-w-[240px] text-right"
+                title="مدیریت و انتخاب سناریو"
+              >
+                <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400 shrink-0" />
+                <div className="flex flex-col min-w-0 text-right flex-1">
+                  <span className="text-[11px] sm:text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
+                    {activePlan?.name || 'برنامه اصلی'}
+                  </span>
+                  <span className="text-[9.5px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                    {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده
+                  </span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isPlanDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* Dropdown Menu (Desktop) */}
-            {isPlanDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-72 z-50">
-                {renderPlanList(() => setIsPlanDropdownOpen(false))}
-              </div>
-            )}
-          </div>
+              {/* Dropdown Menu (Desktop) */}
+              {isPlanDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-72 z-50">
+                  {renderPlanList(() => setIsPlanDropdownOpen(false))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Theme Toggle */}
           <button
@@ -266,6 +285,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
+
+          {/* Share Link */}
+          {!isPreviewMode && (
+            <button
+              type="button"
+              onClick={() => onSharePlan?.(activePlan)}
+              title="اشتراک‌گذاری این برنامه با لینک مستقیم"
+              className="p-1.5 sm:p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-400 hover:bg-indigo-50 dark:hover:bg-emerald-900/20 border border-slate-200 dark:border-[#2a2b30] rounded-xl transition-all shrink-0 cursor-pointer"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Print / Save */}
           <button
@@ -278,48 +309,52 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Primary Action Button */}
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 shrink-0" />
-            <span className="hidden xs:inline">افزودن درس</span>
-            <span className="xs:hidden">درس</span>
-          </button>
+          {!isPreviewMode && (
+            <button
+              type="button"
+              onClick={onOpenAddModal}
+              className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">افزودن درس</span>
+              <span className="xs:hidden">درس</span>
+            </button>
+          )}
 
         </div>
 
       </div>
 
       {/* Mobile Plan Dropdown Bar (Visible on screens < sm) */}
-      <div className="sm:hidden px-3 pb-2.5 relative" ref={mobileDropdownRef}>
-        <button
-          type="button"
-          onClick={() => setIsMobilePlanDropdownOpen(prev => !prev)}
-          className="w-full flex items-center justify-between bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-2 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs text-right"
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Layers className="w-4 h-4 text-indigo-600 dark:text-emerald-400 shrink-0" />
-            <div className="flex flex-col min-w-0 text-right flex-1">
-              <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
-                {activePlan?.name || 'برنامه اصلی'}
-              </span>
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-                {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده • لمس برای مشاهده سایر سناریوها
-              </span>
+      {!isPreviewMode && (
+        <div className="sm:hidden px-3 pb-2.5 relative" ref={mobileDropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsMobilePlanDropdownOpen(prev => !prev)}
+            className="w-full flex items-center justify-between bg-slate-100 hover:bg-slate-200/80 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] rounded-xl px-3 py-2 border border-slate-200 dark:border-[#2a2b30] text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs text-right"
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Layers className="w-4 h-4 text-indigo-600 dark:text-emerald-400 shrink-0" />
+              <div className="flex flex-col min-w-0 text-right flex-1">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
+                  {activePlan?.name || 'برنامه اصلی'}
+                </span>
+                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                  {toPersianDigits(activePlan?.courses.length || 0)} درس ثبت شده • لمس برای مشاهده سایر سناریوها
+                </span>
+              </div>
             </div>
-          </div>
-          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 mr-1 ${isMobilePlanDropdownOpen ? 'rotate-180' : ''}`} />
-        </button>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 mr-1 ${isMobilePlanDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-        {/* Mobile Dropdown Menu */}
-        {isMobilePlanDropdownOpen && (
-          <div className="absolute top-full left-3 right-3 mt-1.5 z-50">
-            {renderPlanList(() => setIsMobilePlanDropdownOpen(false))}
-          </div>
-        )}
-      </div>
+          {/* Mobile Dropdown Menu */}
+          {isMobilePlanDropdownOpen && (
+            <div className="absolute top-full left-3 right-3 mt-1.5 z-50">
+              {renderPlanList(() => setIsMobilePlanDropdownOpen(false))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sub-Nav Tab Bar for screens below lg breakpoint */}
       <div className="flex lg:hidden border-t border-slate-200 dark:border-[#2a2b30] bg-slate-50/90 dark:bg-[#131416]/90 px-2 sm:px-3 py-1.5 justify-center gap-1 sm:gap-1.5 transition-colors duration-200 overflow-x-auto">

@@ -1,14 +1,15 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Course } from '../types/schedule';
+import React, { useState, useMemo, useRef, useEffect, useDeferredValue } from 'react';
+import { Course, DayOfWeek } from '../types/schedule';
 import { 
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
   Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw,
-  Clock, AlertTriangle, SlidersHorizontal
+  Clock, AlertTriangle, SlidersHorizontal, Calendar
 } from 'lucide-react';
 import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity } from '../utils/parsers';
 import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
 import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme, isSameCourse, checkDuplicateGroupWarning } from '../utils/timeUtils';
+import { TimetableGrid } from './TimetableGrid';
 
 // AUT Help Photos
 import autImage1 from '../../assets/Help Photos/aut/image1.png';
@@ -22,6 +23,20 @@ import kntuImage2 from '../../assets/Help Photos/kntu/image2.png';
 import kntuImage3 from '../../assets/Help Photos/kntu/image3.png';
 import kntuImage4 from '../../assets/Help Photos/kntu/image4.png';
 import kntuImage5 from '../../assets/Help Photos/kntu/image5.png';
+
+// IUT Help Photos
+import iutImage1 from '../../assets/Help Photos/iut/image1.png';
+import iutImage2 from '../../assets/Help Photos/iut/image2.png';
+import iutImage3 from '../../assets/Help Photos/iut/image3.png';
+import iutImage4 from '../../assets/Help Photos/iut/image4.png';
+import iutImage5 from '../../assets/Help Photos/iut/image5.png';
+
+// NIT Help Photos
+import nitImage1 from '../../assets/Help Photos/nit/image1.png';
+import nitImage2 from '../../assets/Help Photos/nit/image2.png';
+import nitImage3 from '../../assets/Help Photos/nit/image3.png';
+import nitImage4 from '../../assets/Help Photos/nit/image4.png';
+import nitImage5 from '../../assets/Help Photos/nit/image5.png';
 
 import { GenderBadge } from './GenderBadge';
 import { ConfirmModal, ConfirmModalConfig } from './ConfirmModal';
@@ -37,6 +52,10 @@ interface CourseCatalogModalProps {
   setCatalogCourses: (courses: Course[]) => void;
   studentInfo: { name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null;
   setStudentInfo: (info: { name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null) => void;
+  initialFilterSlot?: { day: DayOfWeek; startTime: string; endTime: string } | null;
+  showFriday?: boolean;
+  onToggleFriday?: () => void;
+  onEditCourse?: (course: Course) => void;
 }
 
 // Function to generate a deterministic unique key for a course (for deduplication / Set behavior)
@@ -80,8 +99,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   catalogCourses,
   setCatalogCourses,
   studentInfo,
-  setStudentInfo
+  setStudentInfo,
+  initialFilterSlot,
+  showFriday,
+  onToggleFriday,
+  onEditCourse
 }) => {
+  // Active Tab in Catalog Modal: 'list' (Courses Catalog list) | 'timetable' (Weekly Schedule Timetable)
+  const [activeCatalogTab, setActiveCatalogTab] = useState<'list' | 'timetable'>('list');
+
   // Upload mode: 'none' (browsing), 'replace' (fresh import/replace), 'append' (add more courses to current catalog)
   const [uploadMode, setUploadMode] = useState<'none' | 'replace' | 'append'>('none');
   const [htmlInput, setHtmlInput] = useState('');
@@ -95,8 +121,8 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   // Selection state for batch operations
   const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(new Set());
 
-  // Visibility filter: 'active' (non-hidden), 'hidden' (only hidden), 'all' (all courses)
-  const [visibilityFilter, setVisibilityFilter] = useState<'active' | 'hidden' | 'all'>('active');
+  // Visibility filter: 'active' (non-hidden), 'hidden' (only hidden), 'added' (registered in plan), 'all' (all courses)
+  const [visibilityFilter, setVisibilityFilter] = useState<'active' | 'hidden' | 'added' | 'all'>('active');
 
   // University Mismatch Modal Alert
   const [universityMismatchModal, setUniversityMismatchModal] = useState<{
@@ -114,6 +140,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   // In-App Confirm Modal State
   const [confirmModal, setConfirmModal] = useState<ConfirmModalConfig | null>(null);
 
+  // Note Viewer Modal State for catalog course notes
+  const [viewingNoteModal, setViewingNoteModal] = useState<{ courseName: string; note: string } | null>(null);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDay, setSelectedDay] = useState<string>('all');
@@ -129,9 +158,42 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const [isTimeFilterActive, setIsTimeFilterActive] = useState<boolean>(false);
   const [timeFilterError, setTimeFilterError] = useState<string | null>(null);
 
-  // Quick Checkboxes to hide conflicting and warning courses
-  const [hideConflictingCourses, setHideConflictingCourses] = useState(false);
-  const [hideWarningCourses, setHideWarningCourses] = useState(false);
+  // Storage keys for persisting catalog filter checkboxes
+  const HIDE_CONFLICTING_KEY = 'unischedule_catalog_hide_conflicting';
+  const HIDE_WARNING_KEY = 'unischedule_catalog_hide_warning';
+
+  // Quick Checkboxes to hide conflicting and warning courses (Persisted in localStorage)
+  const [hideConflictingCourses, setHideConflictingCourses] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HIDE_CONFLICTING_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [hideWarningCourses, setHideWarningCourses] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HIDE_WARNING_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Auto-apply initial filter slot if opened from Timetable Gap selection
+  useEffect(() => {
+    if (isOpen && initialFilterSlot) {
+      setSelectedDay(initialFilterSlot.day);
+      setTimeFilterStart(initialFilterSlot.startTime);
+      setTimeFilterEnd(initialFilterSlot.endTime);
+      setIsTimeFilterActive(true);
+      setTimeFilterError(null);
+      setHideConflictingCourses(true);
+      try {
+        localStorage.setItem(HIDE_CONFLICTING_KEY, 'true');
+      } catch {
+        // ignore
+      }
+    }
+  }, [isOpen, initialFilterSlot]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -148,32 +210,92 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     return SUPPORTED_UNIVERSITIES.find(u => u.id === (isAppendMode ? activeUniversityId : selectedUniv)) || SUPPORTED_UNIVERSITIES[0];
   }, [selectedUniv, activeUniversityId, isAppendMode]);
 
-  // Count hidden and active courses
-  const hiddenCount = useMemo(() => {
-    return catalogCourses.filter(c => c.isHidden).length;
-  }, [catalogCourses]);
+  // Consolidated Map for Course Metadata & Conflicts (Single O(N) pass for all catalog courses)
+  const courseValidationMap = useMemo(() => {
+    const map = new Map<string, {
+      isAdded: boolean;
+      hasConflict: boolean;
+      conflicts: ReturnType<typeof validateCourse>['conflicts'];
+      hasDuplicateWarning: boolean;
+      isEffectivelyHidden: boolean;
+      effectiveNote?: string;
+    }>();
 
-  const activeCount = useMemo(() => {
-    return catalogCourses.filter(c => !c.isHidden).length;
-  }, [catalogCourses]);
+    let conflictCount = 0;
+    let warningCount = 0;
+    let addedCountVal = 0;
+    let hiddenCountVal = 0;
 
-  // Count conflicting & warning courses in current catalog for quick badges on the checkboxes
-  const conflictingCoursesCount = useMemo(() => {
-    return catalogCourses.filter(course => {
-      const matched = existingCourses.find(c => isSameCourse(course, c));
-      if (matched) return false;
-      const { hasConflict } = validateCourse(course, existingCourses);
-      return hasConflict;
-    }).length;
-  }, [catalogCourses, existingCourses]);
+    for (const course of catalogCourses) {
+      const matchedExistingCourse = existingCourses.find(c => isSameCourse(course, c));
+      const isAdded = Boolean(matchedExistingCourse);
+      if (isAdded) addedCountVal++;
 
-  const warningCoursesCount = useMemo(() => {
-    return catalogCourses.filter(course => {
-      const matched = existingCourses.find(c => isSameCourse(course, c));
-      if (matched) return false;
-      return checkDuplicateGroupWarning(course, existingCourses);
-    }).length;
-  }, [catalogCourses, existingCourses]);
+      // Effective note: matched existing course edited note takes priority, otherwise course note from Behestan
+      const effectiveNote = (matchedExistingCourse?.notes && matchedExistingCourse.notes.trim().length > 0)
+        ? matchedExistingCourse.notes.trim()
+        : (course.notes && course.notes.trim().length > 0 ? course.notes.trim() : undefined);
+
+      const otherExistingCourses = matchedExistingCourse 
+        ? existingCourses.filter(c => c.id !== matchedExistingCourse.id) 
+        : existingCourses;
+
+      const { hasConflict, conflicts } = isAdded 
+        ? { hasConflict: false, conflicts: [] } 
+        : validateCourse(course, otherExistingCourses);
+
+      const hasDuplicateWarning = !isAdded && checkDuplicateGroupWarning(course, existingCourses);
+
+      if (!isAdded) {
+        if (hasConflict) conflictCount++;
+        if (hasDuplicateWarning) warningCount++;
+      }
+
+      // Determine isEffectivelyHidden
+      let isEffectivelyHidden = false;
+      if (course.isHidden) {
+        isEffectivelyHidden = true;
+      } else if (!isAdded) {
+        if (hideConflictingCourses && hasConflict) {
+          isEffectivelyHidden = true;
+        } else if (hideWarningCourses && hasDuplicateWarning) {
+          isEffectivelyHidden = true;
+        }
+      }
+
+      if (isEffectivelyHidden) {
+        hiddenCountVal++;
+      }
+
+      map.set(course.id, {
+        isAdded,
+        hasConflict,
+        conflicts,
+        hasDuplicateWarning,
+        isEffectivelyHidden,
+        effectiveNote
+      });
+    }
+
+    return {
+      map,
+      conflictCount,
+      warningCount,
+      addedCount: addedCountVal,
+      hiddenCount: hiddenCountVal,
+      activeCount: catalogCourses.length - hiddenCountVal
+    };
+  }, [catalogCourses, existingCourses, hideConflictingCourses, hideWarningCourses]);
+
+  const isCourseEffectivelyHidden = (course: Course): boolean => {
+    return courseValidationMap.map.get(course.id)?.isEffectivelyHidden ?? false;
+  };
+
+  const hiddenCount = courseValidationMap.hiddenCount;
+  const activeCount = courseValidationMap.activeCount;
+  const addedCount = courseValidationMap.addedCount;
+  const conflictingCoursesCount = courseValidationMap.conflictCount;
+  const warningCoursesCount = courseValidationMap.warningCount;
 
   // Extract unique faculties if present
   const availableFaculties = useMemo(() => {
@@ -450,42 +572,47 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     reader.readAsText(file);
   };
 
-  // Filter courses
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+
+  // Filter courses (using cached validation meta for instant O(1) checks)
   const filteredCourses = useMemo(() => {
+    const q = deferredSearchQuery.toLowerCase().trim();
+
     return catalogCourses.filter(course => {
-      // Visibility Filter
-      if (visibilityFilter === 'active' && course.isHidden) return false;
-      if (visibilityFilter === 'hidden' && !course.isHidden) return false;
+      const meta = courseValidationMap.map.get(course.id);
+      const isAdded = meta?.isAdded ?? false;
+      const effectivelyHidden = meta?.isEffectivelyHidden ?? false;
+
+      // Dynamic Visibility Filter (Active, Hidden, Added, All)
+      if (visibilityFilter === 'active' && effectivelyHidden) return false;
+      if (visibilityFilter === 'hidden' && !effectivelyHidden) return false;
+      if (visibilityFilter === 'added' && !isAdded) return false;
 
       // Search query
-      const matchesSearch = 
-        course.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (course.code && course.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (course.instructor && course.instructor.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (course.faculty && course.faculty.toLowerCase().includes(searchQuery.toLowerCase()));
-      if (!matchesSearch) return false;
+      if (q) {
+        const matchesSearch = 
+          course.name.toLowerCase().includes(q) || 
+          (course.code && course.code.toLowerCase().includes(q)) ||
+          (course.instructor && course.instructor.toLowerCase().includes(q)) ||
+          (course.faculty && course.faculty.toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
 
       // Gender filter
-      const matchesGender = genderFilter === 'all' || course.gender === genderFilter;
-      if (!matchesGender) return false;
+      if (genderFilter !== 'all' && course.gender !== genderFilter) return false;
 
       // Day filter
-      const matchesDay = selectedDay === 'all' || course.sessions.some(s => s.day === selectedDay);
-      if (!matchesDay) return false;
+      if (selectedDay !== 'all' && !course.sessions.some(s => s.day === selectedDay)) return false;
 
       // Exam filter
-      const matchesExam = examFilter === 'all' || 
-        (examFilter === 'has_exam' && course.exam) || 
-        (examFilter === 'no_exam' && !course.exam);
-      if (!matchesExam) return false;
+      if (examFilter === 'has_exam' && !course.exam) return false;
+      if (examFilter === 'no_exam' && course.exam) return false;
 
       // Units filter
-      const matchesUnits = unitFilter === 'all' || course.credits === parseInt(unitFilter, 10);
-      if (!matchesUnits) return false;
+      if (unitFilter !== 'all' && course.credits !== parseInt(unitFilter, 10)) return false;
 
       // Faculty filter
-      const matchesFaculty = selectedFaculty === 'all' || course.faculty === selectedFaculty;
-      if (!matchesFaculty) return false;
+      if (selectedFaculty !== 'all' && course.faculty !== selectedFaculty) return false;
 
       // Time Range filter
       if (isTimeFilterActive) {
@@ -502,8 +629,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     });
   }, [
     catalogCourses, 
+    courseValidationMap,
     visibilityFilter, 
-    searchQuery, 
+    deferredSearchQuery, 
     selectedDay, 
     examFilter, 
     unitFilter, 
@@ -514,56 +642,79 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     timeFilterEnd
   ]);
 
-  // Checkbox Toggle Handlers to update isHidden
+  // Progressive Chunked Rendering (Virtual Pagination for extreme speed)
+  const CHUNK_SIZE = 200;
+  const [visibleLimit, setVisibleLimit] = useState<number>(CHUNK_SIZE);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const modalBodyRef = useRef<HTMLDivElement>(null);
+
+  // Reset visible limit to CHUNK_SIZE whenever search or filters change
+  useEffect(() => {
+    setVisibleLimit(CHUNK_SIZE);
+  }, [deferredSearchQuery, selectedDay, examFilter, unitFilter, selectedFaculty, genderFilter, visibilityFilter, isTimeFilterActive, timeFilterStart, timeFilterEnd, hideConflictingCourses, hideWarningCourses]);
+
+  const displayedCourses = useMemo(() => {
+    return filteredCourses.slice(0, visibleLimit);
+  }, [filteredCourses, visibleLimit]);
+
+  // Load next chunk handler
+  const loadNextChunk = () => {
+    setVisibleLimit((prev) => {
+      if (prev < filteredCourses.length) {
+        return Math.min(prev + CHUNK_SIZE, filteredCourses.length);
+      }
+      return prev;
+    });
+  };
+
+  // Automatic Infinite Scroll loading with IntersectionObserver
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadNextChunk();
+        }
+      },
+      { 
+        root: modalBodyRef.current,
+        rootMargin: '600px', // Pre-load 600px ahead before reaching bottom
+        threshold: 0
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleLimit, filteredCourses.length]);
+
+  // Backup scroll event listener for seamless automatic loading
+  const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 700) {
+      loadNextChunk();
+    }
+  };
+
+  // Checkbox Toggle Handlers (Persist state to localStorage)
   const handleToggleHideConflicting = (checked: boolean) => {
     setHideConflictingCourses(checked);
-    setCatalogCourses(prev => prev.map(course => {
-      const matched = existingCourses.find(c => isSameCourse(course, c));
-      if (matched) return course;
-      const { hasConflict } = validateCourse(course, existingCourses);
-      if (hasConflict) {
-        return { ...course, isHidden: checked };
-      }
-      return course;
-    }));
+    try {
+      localStorage.setItem(HIDE_CONFLICTING_KEY, checked ? 'true' : 'false');
+    } catch {
+      // ignore
+    }
   };
 
   const handleToggleHideWarnings = (checked: boolean) => {
     setHideWarningCourses(checked);
-    setCatalogCourses(prev => prev.map(course => {
-      const matched = existingCourses.find(c => isSameCourse(course, c));
-      if (matched) return course;
-      const hasDuplicateWarning = checkDuplicateGroupWarning(course, existingCourses);
-      if (hasDuplicateWarning) {
-        return { ...course, isHidden: checked };
-      }
-      return course;
-    }));
+    try {
+      localStorage.setItem(HIDE_WARNING_KEY, checked ? 'true' : 'false');
+    } catch {
+      // ignore
+    }
   };
-
-  // Synchronize isHidden when existingCourses change if checkboxes are active
-  useEffect(() => {
-    if (!hideConflictingCourses && !hideWarningCourses) return;
-
-    setCatalogCourses(prev => prev.map(course => {
-      const matched = existingCourses.find(c => isSameCourse(course, c));
-      if (matched) return course;
-
-      let shouldHide = course.isHidden;
-      if (hideConflictingCourses) {
-        const { hasConflict } = validateCourse(course, existingCourses);
-        if (hasConflict) shouldHide = true;
-      }
-      if (hideWarningCourses) {
-        const hasWarning = checkDuplicateGroupWarning(course, existingCourses);
-        if (hasWarning) shouldHide = true;
-      }
-      if (shouldHide !== course.isHidden) {
-        return { ...course, isHidden: shouldHide };
-      }
-      return course;
-    }));
-  }, [existingCourses, hideConflictingCourses, hideWarningCourses]);
 
   // Single Course Actions
   const handleToggleHideSingleCourse = (courseId: string) => {
@@ -697,10 +848,11 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
-      <div className="bg-white dark:bg-[#131416] w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-6xl lg:max-w-7xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#2a2b30] relative">
+      <div className="bg-white dark:bg-[#131416] w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-7xl 2xl:max-w-[1500px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#2a2b30] relative">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 dark:border-[#1c1d21] bg-white dark:bg-[#131416] shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-100 dark:border-[#1c1d21] bg-white dark:bg-[#131416] shrink-0">
+          {/* Right Side: Title & University Info */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-emerald-950/40 text-indigo-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-emerald-800/30">
               <BookOpen className="w-5 h-5" />
@@ -725,13 +877,63 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1c1d21] rounded-xl transition-colors cursor-pointer"
-            title="بستن"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          {/* Left Side: Prominent Tab Bar & Close Button */}
+          <div className="flex items-center gap-2 sm:gap-3 mr-auto">
+            {hasCatalog && !isImportViewOpen && (
+              <div className="flex items-center bg-slate-100 dark:bg-[#1a1c23] p-1 sm:p-1.5 rounded-2xl border-2 border-indigo-100 dark:border-emerald-950/60 shadow-xs gap-1 sm:gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveCatalogTab('list')}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer select-none ${
+                    activeCatalogTab === 'list'
+                      ? 'bg-indigo-600 dark:bg-[#00B87C] text-white dark:text-black shadow-md shadow-indigo-500/20 dark:shadow-emerald-500/20 ring-2 ring-indigo-600/30 dark:ring-emerald-400/30 scale-[1.02]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-300 hover:bg-white/80 dark:hover:bg-[#25262c]'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 shrink-0" />
+                  <span>فهرست دروس</span>
+                  <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.2 rounded-full font-black ${
+                    activeCatalogTab === 'list'
+                      ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                    {toPersianDigits(filteredCourses.length)}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveCatalogTab('timetable')}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer select-none ${
+                    activeCatalogTab === 'timetable'
+                      ? 'bg-indigo-600 dark:bg-[#00B87C] text-white dark:text-black shadow-md shadow-indigo-500/20 dark:shadow-emerald-500/20 ring-2 ring-indigo-600/30 dark:ring-emerald-400/30 scale-[1.02]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-emerald-300 hover:bg-white/80 dark:hover:bg-[#25262c]'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>جدول هفتگی</span>
+                  <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.2 rounded-full font-black ${
+                    activeCatalogTab === 'timetable'
+                      ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                    {toPersianDigits(existingCourses.length)}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            <div className="h-6 w-px bg-slate-200 dark:bg-[#2a2b30] hidden sm:block" />
+
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1c1d21] rounded-xl transition-colors cursor-pointer"
+              title="بستن"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Toast / Feedback Banner */}
@@ -743,7 +945,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         )}
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0b0c0e]">
+        <div ref={modalBodyRef} onScroll={handleModalScroll} className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0b0c0e]">
           
           {isImportViewOpen ? (
             /* ================= STATE 1: UPLOAD / APPEND / REPLACE ================= */
@@ -974,6 +1176,112 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       </div>
                     )}
 
+                    {/* IUT SPECIFIC GUIDE */}
+                    {currentUnivObj.id === 'iut' && (
+                      <div className="space-y-6 animate-in fade-in duration-150">
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۱. وارد پورتال آموزشی بهستان (صنعتی اصفهان) شوید.</p>
+                          <p className="leading-relaxed font-medium">۲. در قسمت جست و جو، کد <strong>110</strong> را وارد کنید و <strong>Enter</strong> بزنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={iutImage1} alt="جستجوی فرم ۱۱۰" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۳. فیلترهای مدنظر برای دروس مدنظر را انتخاب کرده و در آخر روی دکمه <strong>"مشاهده گزارش"</strong> بزنید</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                            (نکته مهم: فیلتر "نمایش اطلاعات امتحان" را روی «بله» قرار دهید)
+                          </p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={iutImage2} alt="مشاهده گزارش ۱۱۰" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۴. در پنجره جدید لیست دروس خود را مشاهده میکنید. پایین لیست روی دکمه <strong>"نمایش جدولی"</strong> کلیک کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={iutImage3} alt="دکمه نمایش جدولی صنعتی اصفهان" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۵. روی صفحه جدید باز شده راست کلیک کنید و گزینه <strong>"inspect"</strong> را انتخاب کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={iutImage4} alt="Inspect صفحه صنعتی اصفهان" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۶. در صفحه جدید کد html ای مشاهده میکنید. روی خط اول کد ( <strong>&lt;html&gt;</strong> ) راست کلیک کنید و در قسمت <strong>Copy</strong>، روی <strong>Copy outerHTML</strong> کلیک کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={iutImage5} alt="کپی outerHTML صنعتی اصفهان" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="bg-blue-100/70 dark:bg-blue-900/40 p-4 sm:p-5 rounded-2xl border border-blue-200 dark:border-blue-800/60 text-sm sm:text-[15px] leading-relaxed sm:leading-7 font-medium text-blue-950 dark:text-blue-100 space-y-2">
+                          <p>
+                            ۷. کد html درون کلیپ بورد شما کپی شده. میتوانید کد را مستقیما درون قسمت مشخص شده paste کنید و یا میتوانید درون کامپیوتر خود فایل تکست ساخته و محتوای کد را درون آن paste کرده و در آخر فایل را با پسوند <strong>html.</strong> ذخیره کنید و فایل ساخته شده را در قسمت مشخص شده آپلود کنید.
+                          </p>
+                          <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300 font-bold">
+                            (از مرورگرهای Microsoft Edge/Google Chrome برای وارد شدن به پورتال اموزشی استفاده کنید. مشکلاتی در حین استفاده از مرورگر Mozilla Firefox گزارش شده.)
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* NIT SPECIFIC GUIDE */}
+                    {currentUnivObj.id === 'nit' && (
+                      <div className="space-y-6 animate-in fade-in duration-150">
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۱. وارد پورتال آموزشی بهستان (نوشیروانی) شوید.</p>
+                          <p className="leading-relaxed font-medium">۲. در قسمت جست و جو، کد <strong>110</strong> را وارد کنید و <strong>Enter</strong> بزنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={nitImage1} alt="جستجوی فرم ۱۱۰ نوشیروانی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۳. فیلترهای مدنظر برای دروس مدنظر را انتخاب کرده و در آخر روی دکمه <strong>"مشاهده گزارش"</strong> بزنید</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                            (نکته مهم: فیلتر "نمایش اطلاعات امتحان" را روی «بله» قرار دهید)
+                          </p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={nitImage2} alt="مشاهده گزارش ۱۱۰ نوشیروانی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۴. در پنجره جدید لیست دروس خود را مشاهده میکنید. پایین لیست روی دکمه <strong>"نمایش جدولی"</strong> کلیک کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={nitImage3} alt="دکمه نمایش جدولی نوشیروانی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۵. روی صفحه جدید باز شده راست کلیک کنید و گزینه <strong>"inspect"</strong> را انتخاب کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={nitImage4} alt="Inspect صفحه نوشیروانی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۶. در صفحه جدید کد html ای مشاهده میکنید. روی خط اول کد ( <strong>&lt;html&gt;</strong> ) راست کلیک کنید و در قسمت <strong>Copy</strong>، روی <strong>Copy outerHTML</strong> کلیک کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={nitImage5} alt="کپی outerHTML نوشیروانی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="bg-blue-100/70 dark:bg-blue-900/40 p-4 sm:p-5 rounded-2xl border border-blue-200 dark:border-blue-800/60 text-sm sm:text-[15px] leading-relaxed sm:leading-7 font-medium text-blue-950 dark:text-blue-100 space-y-2">
+                          <p>
+                            ۷. کد html درون کلیپ بورد شما کپی شده. میتوانید کد را مستقیما درون قسمت مشخص شده paste کنید و یا میتوانید درون کامپیوتر خود فایل تکست ساخته و محتوای کد را درون آن paste کرده و در آخر فایل را با پسوند <strong>html.</strong> ذخیره کنید و فایل ساخته شده را در قسمت مشخص شده آپلود کنید.
+                          </p>
+                          <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300 font-bold">
+                            (از مرورگرهای Microsoft Edge/Google Chrome برای وارد شدن به پورتال اموزشی استفاده کنید. مشکلاتی در حین استفاده از مرورگر Mozilla Firefox گزارش شده.)
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </details>
               </div>
@@ -1061,7 +1369,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
             /* ================= STATE 2: BROWSE & QUICK ADD ================= */
             <div className="flex flex-col h-full">
               
-              {/* Sticky Top Bar (Filters & Info) */}
+              {/* Sticky Top Bar (Tabs, Filters & Info) */}
               <div className="sticky top-0 z-10 bg-white/95 dark:bg-[#131416]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#2a2b30] p-4 sm:p-5 space-y-3.5 shadow-xs">
                 
                 {/* University Badge & Actions */}
@@ -1138,8 +1446,10 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   </div>
                 </div>
 
-                {/* Filter Controls Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2.5">
+                {/* Filter Controls Row (Only active when in list tab) */}
+                {activeCatalogTab === 'list' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2.5">
                   
                   {/* Search Box */}
                   <div className="relative sm:col-span-2">
@@ -1173,7 +1483,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     )}
                   </div>
 
-                  {/* Visibility Filter (Active, Hidden, All) */}
+                  {/* Visibility Filter (Active, Added, Hidden, All) */}
                   <div>
                     <select
                       value={visibilityFilter}
@@ -1181,12 +1491,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
                         visibilityFilter === 'hidden'
                           ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 ring-1 ring-amber-400/20 shadow-xs'
-                          : visibilityFilter === 'all'
-                            ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
-                            : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                          : visibilityFilter === 'added'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-200 ring-1 ring-emerald-500/20 shadow-xs'
+                            : visibilityFilter === 'all'
+                              ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                              : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
                       }`}
                     >
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="active">دروس فعال ({toPersianDigits(activeCount)})</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="added">ثبت شده در برنامه ({toPersianDigits(addedCount)})</option>
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="hidden">پنهان‌شده‌ها ({toPersianDigits(hiddenCount)})</option>
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">همه دروس ({toPersianDigits(catalogCourses.length)})</option>
                     </select>
@@ -1535,11 +1848,13 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     </div>
                   )}
                 </div>
+              </>
+            )}
 
-              </div>
+          </div>
 
-              {/* Course Grid */}
-              <div className="p-4 sm:p-6 pb-20">
+          {/* Tab 1: Course Catalog Grid (Persisted in DOM to eliminate any remount freeze) */}
+          <div className={activeCatalogTab === 'list' ? 'p-4 sm:p-6 pb-20' : 'hidden'}>
                 {filteredCourses.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500 space-y-2 text-center">
                     <Search className="w-10 h-10 opacity-40" />
@@ -1548,17 +1863,16 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {filteredCourses.map(course => {
-                      const matchedExistingCourse = existingCourses.find(c => isSameCourse(course, c));
-                      const isAdded = Boolean(matchedExistingCourse);
-                      const otherExistingCourses = matchedExistingCourse 
-                        ? existingCourses.filter(c => c.id !== matchedExistingCourse.id) 
-                        : existingCourses;
-                      const { hasConflict, conflicts } = isAdded ? { hasConflict: false, conflicts: [] } : validateCourse(course, otherExistingCourses);
-                      const hasDuplicateWarning = !isAdded && checkDuplicateGroupWarning(course, existingCourses);
+                    {displayedCourses.map(course => {
+                      const meta = courseValidationMap.map.get(course.id);
+                      const isAdded = meta?.isAdded ?? false;
+                      const hasConflict = meta?.hasConflict ?? false;
+                      const conflicts = meta?.conflicts ?? [];
+                      const hasDuplicateWarning = meta?.hasDuplicateWarning ?? false;
+                      const isHidden = meta?.isEffectivelyHidden ?? false;
+                      const matchedExistingCourse = isAdded ? existingCourses.find(c => isSameCourse(course, c)) : undefined;
                       const theme = getCourseTheme(course.color);
                       const isChecked = selectedCourseIds.has(course.id);
-                      const isHidden = Boolean(course.isHidden);
 
                       return (
                         <div 
@@ -1637,6 +1951,25 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                         <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                                         <span>گروه موازی</span>
                                       </span>
+                                    )}
+
+                                    {/* Course Note Badge (Teal Theme - Non-Amber) */}
+                                    {meta?.effectiveNote && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setViewingNoteModal({
+                                            courseName: course.name,
+                                            note: meta.effectiveNote!
+                                          });
+                                        }}
+                                        className="text-[11px] font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 hover:bg-teal-100 dark:hover:bg-teal-900/60 px-2.5 py-0.5 rounded-md border border-teal-200 dark:border-teal-800/40 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                                        title="برای مشاهده متن کامل یادداشت کلیک کنید"
+                                      >
+                                        <FileText className="w-3 h-3 text-teal-600 dark:text-teal-400 shrink-0" />
+                                        <span className="whitespace-nowrap">یادداشت: برای مشاهده کلیک کنید</span>
+                                      </button>
                                     )}
 
                                     {course.capacity && (
@@ -1821,6 +2154,56 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     })}
                   </div>
                 )}
+
+                {/* Infinite Scroll Sentinel & Load More button */}
+                {filteredCourses.length > 0 && visibleLimit < filteredCourses.length && (
+                  <div ref={loadMoreSentinelRef} className="flex flex-col items-center justify-center pt-6 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleLimit(prev => Math.min(prev + CHUNK_SIZE, filteredCourses.length))}
+                      className="px-6 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-[#1c1d21] dark:hover:bg-[#25262c] border border-indigo-200 dark:border-[#383a40] text-indigo-700 dark:text-emerald-400 rounded-2xl text-xs font-black transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>بارگذاری {toPersianDigits(Math.min(CHUNK_SIZE, filteredCourses.length - visibleLimit))} درس بعدی...</span>
+                      <span className="text-[10px] opacity-75">({toPersianDigits(displayedCourses.length)} از {toPersianDigits(filteredCourses.length)})</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tab 2: Timetable Grid View (Persisted in DOM for instant 0ms tab switching) */}
+              <div className={activeCatalogTab === 'timetable' ? 'p-4 sm:p-6 pb-20 space-y-4' : 'hidden'}>
+                <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 dark:from-emerald-950/30 dark:via-slate-900/50 dark:to-emerald-950/30 border border-indigo-100 dark:border-emerald-800/40 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-indigo-950 dark:text-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600 dark:text-emerald-400 shrink-0 animate-pulse" />
+                    <span className="leading-relaxed font-medium">
+                      در این بخش وضعیت فعلی جدول هفتگی خود را مشاهده می‌کنید. می‌توانید با فعال کردن گزینه <strong>«انتخاب از بانک دروس»</strong>، روی هر یک از بازه‌های خالی جدول کلیک کنید تا بلافاصله به فهرست دروس بازگشته و دروس متناسب با آن بازه زمانی فیلتر شوند.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCatalogTab('list')}
+                    className="px-4 py-2 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl font-bold shrink-0 transition-all cursor-pointer text-xs shadow-xs text-center whitespace-nowrap"
+                  >
+                    بازگشت به فهرست دروس
+                  </button>
+                </div>
+
+                <TimetableGrid
+                  courses={existingCourses}
+                  onEditCourse={onEditCourse || (() => {})}
+                  onDeleteCourse={onRemoveCourse}
+                  onAddCourseAtSlot={() => {}}
+                  onSelectGapFromCatalog={(day, startTime, endTime) => {
+                    setSelectedDay(day);
+                    setTimeFilterStart(startTime);
+                    setTimeFilterEnd(endTime);
+                    setIsTimeFilterActive(true);
+                    setActiveCatalogTab('list');
+                  }}
+                  showFriday={showFriday ?? false}
+                  onToggleFriday={onToggleFriday || (() => {})}
+                  isPreviewMode={false}
+                />
               </div>
 
             </div>
@@ -1953,6 +2336,48 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
               تأیید و ذخیره هویت
             </button>
 
+          </div>
+        </div>
+      )}
+
+      {/* Note Viewer Modal Popup */}
+      {viewingNoteModal && (
+        <div 
+          className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150" 
+          dir="rtl"
+          onClick={() => setViewingNoteModal(null)}
+        >
+          <div 
+            className="bg-white dark:bg-[#18191d] rounded-3xl max-w-md w-full p-6 border border-slate-200 dark:border-[#2a2b30] shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2a2b30]">
+              <div className="flex items-center gap-2 text-teal-700 dark:text-teal-400 font-extrabold text-sm">
+                <FileText className="w-4 h-4" />
+                <span>یادداشت درس {viewingNoteModal.courseName}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingNoteModal(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#25262c] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-teal-50/50 dark:bg-teal-950/20 p-4 rounded-2xl border border-teal-100 dark:border-teal-900/30 text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap select-text max-h-[60vh] overflow-y-auto font-medium">
+              {viewingNoteModal.note}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setViewingNoteModal(null)}
+                className="px-5 py-2 bg-slate-100 dark:bg-[#25262c] hover:bg-slate-200 dark:hover:bg-[#30323a] text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
           </div>
         </div>
       )}
