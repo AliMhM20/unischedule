@@ -1,6 +1,0 @@
-name = "unischedule"
-compatibility_date = "2024-09-23"
-
-[assets]
-directory = "./dist"
-binding = "ASSETS"
