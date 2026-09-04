@@ -95,7 +95,9 @@ jobs:
 
       - name: Build Application & Linux Packages (.deb / AppImage)
         run: |
-          npm run electron:build:linux
+          npm run build -- --base=./
+          npx electron-builder --linux --publish never
+
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
