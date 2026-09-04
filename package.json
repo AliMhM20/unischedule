@@ -13,7 +13,8 @@
     "clean": "rm -rf dist release server.js",
     "lint": "tsc --noEmit",
     "electron:dev": "concurrently -k \"vite --port=3000\" \"wait-on tcp:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 NODE_ENV=development electron .\"",
-    "electron:build": "vite build --base=./ && electron-builder"
+    "electron:build": "vite build --base=./ && electron-builder",
+    "electron:build:linux": "vite build --base=./ && electron-builder --linux"
   },
   "build": {
     "appId": "com.unischedule.app",
@@ -51,6 +52,14 @@
         }
       ]
     },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Education",
+      "icon": "build/icon.png"
+    },
     "nsis": {
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": false,
@@ -64,6 +73,7 @@
       "artifactName": "${productName}-${version}.${ext}"
     }
   },
+
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",

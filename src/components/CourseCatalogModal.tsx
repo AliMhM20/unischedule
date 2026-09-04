@@ -4,9 +4,13 @@ import {
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
   Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw,
-  Clock, AlertTriangle, SlidersHorizontal, Calendar
+  Clock, AlertTriangle, SlidersHorizontal, Calendar, Globe, ShieldCheck
 } from 'lucide-react';
 import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity } from '../utils/parsers';
+import { parseAutPassedCourses } from '../utils/parsers/autPassedCoursesParser';
+import { getPassedCourses, appendPassedCourses, isCoursePassed } from '../utils/passedCoursesStorage';
+import { PassedCourse } from '../types/schedule';
+
 import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
 import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme, isSameCourse, checkDuplicateGroupWarning } from '../utils/timeUtils';
 import { TimetableGrid } from './TimetableGrid';
@@ -118,8 +122,13 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const [detectedToast, setDetectedToast] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Passed Courses state
+  const [passedCourses, setPassedCourses] = useState<PassedCourse[]>(() => getPassedCourses());
+  const [hidePassedCourses, setHidePassedCourses] = useState<boolean>(true);
+
   // Selection state for batch operations
   const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(new Set());
+
 
   // Visibility filter: 'active' (non-hidden), 'hidden' (only hidden), 'added' (registered in plan), 'all' (all courses)
   const [visibilityFilter, setVisibilityFilter] = useState<'active' | 'hidden' | 'added' | 'all'>('active');
@@ -446,7 +455,47 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     }
   };
 
+  const handleOpenPortalWindow = async () => {
+    if (window.electronAPI?.openAutPortalWindow) {
+      await window.electronAPI.openAutPortalWindow();
+      setDetectedToast('پنجره مرورگر پورتال باز شد. وارد شوید، گزارش ۲۱۲ را جستجو کرده و نمایش جدولی را بزنید.');
+      setTimeout(() => setDetectedToast(null), 6000);
+    } else {
+      setError('این قابلیت اختصاصی نسخه دسکتاپ (ویندوز / لینوکس) است. در نسخه وب، لطفاً فایل HTML را دانلود و بارگذاری کنید.');
+    }
+  };
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const unsubscribeCourses = window.electronAPI.onAutCoursesCaptured?.((capturedHtml) => {
+      if (capturedHtml) {
+        handleProcessHtml(capturedHtml);
+        setDetectedToast('جدول دروس به‌طور خودکار از پورتال استخراج و به بانک دروس اضافه شد!');
+        setTimeout(() => setDetectedToast(null), 5000);
+      }
+    });
+
+    const unsubscribePassed = window.electronAPI.onAutPassedCoursesCaptured?.((capturedHtml) => {
+      if (capturedHtml) {
+        const result = parseAutPassedCourses(capturedHtml);
+        if (result.passedCourses.length > 0) {
+          const updated = appendPassedCourses(result.passedCourses);
+          setPassedCourses(updated);
+          setDetectedToast(`تعداد ${toPersianDigits(result.passedCourses.length)} درس پاس‌شده به‌طور خودکار ثبت گردید.`);
+          setTimeout(() => setDetectedToast(null), 5000);
+        }
+      }
+    });
+
+    return () => {
+      if (unsubscribeCourses) unsubscribeCourses();
+      if (unsubscribePassed) unsubscribePassed();
+    };
+  }, []);
+
   // Reload catalog from all stored raw HTML sources
+
   const handleReloadCatalogFromSources = async () => {
     try {
       setIsReloadingSources(true);
@@ -587,6 +636,12 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       if (visibilityFilter === 'active' && effectivelyHidden) return false;
       if (visibilityFilter === 'hidden' && !effectivelyHidden) return false;
       if (visibilityFilter === 'added' && !isAdded) return false;
+
+      // Passed courses filter
+      if (hidePassedCourses && isCoursePassed(passedCourses, course.code, course.name)) {
+        return false;
+      }
+
 
       // Search query
       if (q) {
@@ -1295,7 +1350,38 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
               {/* Upload & Paste Inputs */}
               <div className="grid grid-cols-1 gap-4">
+                {/* Method 0: Direct Portal Login & Auto Fetch (Windows & Linux Desktop) */}
+                <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-6 rounded-3xl text-white shadow-xl space-y-4 border border-indigo-700/40 relative overflow-hidden">
+                  <div className="flex items-start justify-between gap-4 relative z-10">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>روش هوشمند خودکار (ویژه ویندوز / لینوکس)</span>
+                      </div>
+                      <h4 className="text-base font-black text-white pt-1">
+                        ورود به سامانه پورتال و دریافت خودکار دروس
+                      </h4>
+                      <p className="text-xs text-indigo-200/80 leading-relaxed max-w-md">
+                        ورود به پورتال، جستجوی ۲۱۲ و کلیک روی «نمایش جدولی». دروس و کارنامه دروس پاس‌شده به‌طور خودکار استخراج و ثبت خواهند شد.
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
+                      <Globe className="w-6 h-6" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenPortalWindow}
+                    className="w-full py-3 px-5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black rounded-2xl text-xs sm:text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>ورود به سایت و استخراج هوشمند دروس</span>
+                  </button>
+                </div>
+
                 {/* Method 1: File Upload (Supports Drag & Drop + Click) */}
+
                 <div
                   onDragOver={handleDragOver}
                   onDragEnter={handleDragEnter}
@@ -1772,6 +1858,30 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       )}
                     </div>
                   </label>
+
+                  {/* Hide Passed Courses Checkbox */}
+                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    hidePassedCourses
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                      : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={hidePassedCourses}
+                      onChange={(e) => setHidePassedCourses(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className={`w-3.5 h-3.5 ${hidePassedCourses ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                      <span className="font-bold">پنهان‌سازی دروس پاس‌شده</span>
+                      {passedCourses.length > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-extrabold">
+                          {toPersianDigits(passedCourses.length)}
+                        </span>
+                      )}
+                    </div>
+                  </label>
+
                 </div>
 
                 {/* Batch Bar & Select All Header */}
