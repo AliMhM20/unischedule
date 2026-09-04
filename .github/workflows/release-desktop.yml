@@ -1,4 +1,4 @@
-name: Build & Release Desktop App (Windows)
+name: Build & Release Desktop App (Windows & Linux)
 
 on:
   push:
@@ -7,15 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'نسخه مورد نظر برای انتشار (مثال: 1.3.9)'
+        description: 'نسخه مورد نظر برای انتشار (مثال: 1.5.0)'
         required: false
-        default: '1.3.9'
+        default: '1.5.0'
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-windows:
     name: Build Windows Installer & Release
     runs-on: windows-latest
 
@@ -57,29 +57,58 @@ jobs:
           name: UniSchedule v${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
-          body: |
-            <div dir="rtl">
-
-            ## 🚀 تغییرات و قابلیت‌های جدید نسخه ۱.۵.۰ `UniSchedule`
-
-            در این به‌روزرسانی بزرگ، دانشگاه‌های جدیدی به سامانه اضافه شدند، امکان اشتراک‌گذاری سریع و آسان برنامه فراهم شد و تجربه کاربری در بانک دروس و جدول هفتگی به طور چشمگیری ارتقا یافته است:
-
-            - 🎓 **پشتیبانی کامل از دانشگاه صنعتی اصفهان (`IUT`):** امکان بارگذاری و استخراج خودکار دروس از سامانه بهستان به همراه راهنمای تصویری قدم‌به‌قدم برای دانشجویان صنعتی اصفهان.
-            - 🏛️ **پشتیبانی کامل از دانشگاه صنعتی نوشیروانی بابل (`NIT`):** اضافه شدن پارسر اختصاصی گزارش‌های بهستان و راهنمای تصویری ۵ مرحله‌ای برای استفاده مستقیم از بانک دروس.
-            - 🧠 **سیستم تشخیص هوشمند و خودکار دانشگاه:** ارتقای الگوریتم تشخیص فایل‌های `HTML` بدون ایجاد هیچ‌گونه تداخل یا خطای تشخیصی میان دانشگاه‌ها.
-            - 🔗 **اشتراک‌گذاری آسان و سریع برنامه درسی:** امکان ارسال مستقیم برنامه هفتگی از طریق لینک فشرده اینترنتی (`URL`) یا کد برنامه برای دوستان و دریافت و ثبت خودکار آن در برنامه.
-            - 🗓️ **ناوبری دوگانه تب‌ها در بانک دروس:** اضافه شدن تب‌بار شیک (فهرست دروس و جدول هفتگی) در بالای بانک دروس برای جابجایی راحت‌تر میان لیست دروس و جدول بدون بستن پنجره یا پاک شدن فیلترها.
-            - ⚡ **دکمه انتخاب از بانک دروس در جدول هفتگی:** امکان کلیک مستقیم روی ساعت‌های خالی جدول هفتگی جهت پیدا کردن راحت‌تر دروس متناسب با آن زمان و فیلتر خودکار فهرست دروس.
-            - 📝 **مشاهده یادداشت‌ها و توضیحات تکمیلی دروس:** استخراج خودکار توضیحات اساتید از سامانه بهستان و نمایش بج اختصاصی یادداشت روی کارت دروس با قابلیت مشاهده متن کامل در پنجره اختصاصی.
-            - 💨 **افزایش چشمگیر سرعت و روانی برنامه:** بهینه‌سازی کامل فرآیند رندر برای جابجایی کاملاً آنی میان تب‌ها، بدون کوچک‌ترین افت فریم یا فریز شدن صفحه.
-
-            ---
-            ✈️ **کانال رسمی تلگرام `UniSchedule`:** [t.me/UniSchedule_aut](https://t.me/UniSchedule_aut)
-
-            </div>
           files: |
             release/*.exe
             release/*.blockmap
             release/latest.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux Packages (.deb & AppImage) & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Determine Version
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CLEAN_VER=$(echo "${{ github.event.inputs.version }}" | sed 's/^v//')
+          else
+            CLEAN_VER=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          fi
+          echo "version=$CLEAN_VER" >> $GITHUB_OUTPUT
+          echo "Building UniSchedule Version: $CLEAN_VER"
+
+      - name: Install Dependencies
+        run: npm install --include=optional
+
+      - name: Build Application & Linux Packages (.deb / AppImage)
+        run: |
+          npm run build -- --base=./
+          npx electron-builder --linux --publish never
+
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: UniSchedule v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            release/*.deb
+            release/*.AppImage
+            release/latest-linux.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

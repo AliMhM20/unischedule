@@ -29,4 +29,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('updater-error', handler);
     return () => ipcRenderer.removeListener('updater-error', handler);
   },
+  openAutPortalWindow: () => ipcRenderer.invoke('open-aut-portal-window'),
+  onAutCoursesCaptured: (callback) => {
+    const handler = (_, html) => callback(html);
+    ipcRenderer.on('aut-courses-html-captured', handler);
+    return () => ipcRenderer.removeListener('aut-courses-html-captured', handler);
+  },
+  onAutPassedCoursesCaptured: (callback) => {
+    const handler = (_, html) => callback(html);
+    ipcRenderer.on('aut-passed-courses-html-captured', handler);
+    return () => ipcRenderer.removeListener('aut-passed-courses-html-captured', handler);
+  },
 });
+

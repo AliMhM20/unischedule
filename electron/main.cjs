@@ -108,11 +108,103 @@ autoUpdater.on('update-cancelled', () => {
   }
 });
 
-autoUpdater.on('error', (err) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('updater-error', err?.message || 'خطا در دانلود به‌روزرسانی');
+let portalWindow = null;
+
+
+function attachHtmlCaptureListeners(win) {
+  let lastCapturedCoursesHtml = '';
+  let lastCapturedPassedHtml = '';
+
+  const checkDOM = async () => {
+    if (!win || win.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return;
+    try {
+      const html = await win.webContents.executeJavaScript(`
+        document.documentElement ? document.documentElement.outerHTML : ''
+      `);
+      if (!html) return;
+
+      // Detect Report 212 Table View (has course table elements)
+      const isCourseTable = 
+        (html.includes('شماره و گروه') || html.includes('نام درس')) &&
+        (html.includes('ساعات ارائه') || html.includes('استاد') || html.includes('امتحان') || html.includes('ظرفیت'));
+
+      if (isCourseTable && html !== lastCapturedCoursesHtml) {
+        lastCapturedCoursesHtml = html;
+        mainWindow.webContents.send('aut-courses-html-captured', html);
+      }
+
+      // Detect Academic Info / Passed Courses ("اطلاعات تحصیلی")
+      const isAcademicInfo = 
+        html.includes('تعداد واحد اخذ شده') || 
+        html.includes('معدل کل') ||
+        (html.includes('وضعیت تحصیلی') && (html.includes('ترم اول') || html.includes('ترم دوم')));
+
+      if (isAcademicInfo && html !== lastCapturedPassedHtml) {
+        lastCapturedPassedHtml = html;
+        mainWindow.webContents.send('aut-passed-courses-html-captured', html);
+      }
+    } catch (e) {
+      // Ignore navigation errors
+    }
+  };
+
+  const intervalId = setInterval(checkDOM, 1500);
+
+  win.on('closed', () => {
+    clearInterval(intervalId);
+  });
+}
+
+ipcMain.handle('open-aut-portal-window', async () => {
+  if (portalWindow && !portalWindow.isDestroyed()) {
+    portalWindow.focus();
+    return { success: true };
   }
+
+  portalWindow = new BrowserWindow({
+    width: 1100,
+    height: 750,
+    title: 'سامانه پورتال دانشگاه صنعتی امیرکبیر',
+    icon: path.join(__dirname, '../build/icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+
+  portalWindow.webContents.setWindowOpenHandler(({ url }) => {
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        width: 1000,
+        height: 700,
+        autoHideMenuBar: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: false,
+        },
+      },
+    };
+  });
+
+  portalWindow.webContents.on('did-create-window', (childWindow) => {
+    attachHtmlCaptureListeners(childWindow);
+  });
+
+  attachHtmlCaptureListeners(portalWindow);
+
+  portalWindow.loadURL('https://portal.aut.ac.ir/browser/fa/#/auth/login');
+
+  portalWindow.on('closed', () => {
+    portalWindow = null;
+  });
+
+  return { success: true };
 });
+
 
 app.name = 'UniSchedule';
 try {

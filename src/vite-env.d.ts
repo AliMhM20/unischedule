@@ -46,6 +46,10 @@ interface Window {
     onUpdateDownloaded: (callback: (info: { version?: string; releaseNotes?: string }) => void) => () => void;
     onUpdateCancelled?: (callback: () => void) => () => void;
     onUpdateError: (callback: (error: string) => void) => () => void;
+    openAutPortalWindow?: () => Promise<{ success: boolean }>;
+    onAutCoursesCaptured?: (callback: (html: string) => void) => () => void;
+    onAutPassedCoursesCaptured?: (callback: (html: string) => void) => () => void;
   };
 }
+
 

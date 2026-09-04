@@ -56,3 +56,16 @@ export interface SchedulePlan {
   createdAt: number;
 }
 
+export interface PassedCourse {
+  code: string;            // base course code e.g. "3108053"
+  name: string;            // e.g. "مبانی هوش محاسباتی"
+  credits?: number;        // e.g. 3
+  termName?: string;       // e.g. "ترم اول 06-05"
+  group?: string;          // e.g. "01"
+  courseType?: string;     // e.g. "تخصصی"
+  status?: string;         // e.g. "ثبت نهایی" / "پاس شده"
+  grade?: string;          // e.g. "17.5"
+  passedAt: number;
+}
+
+
