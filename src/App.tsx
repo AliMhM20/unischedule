@@ -9,6 +9,7 @@ import { CourseFormModal } from './components/CourseFormModal';
 import { CourseCatalogModal } from './components/CourseCatalogModal';
 import { PlanModal } from './components/PlanModal';
 import { ShareModal } from './components/ShareModal';
+import { DonationModal } from './components/DonationModal';
 import { AnnouncementModal } from './components/AnnouncementModal';
 import { ConfirmModal, ConfirmModalConfig } from './components/ConfirmModal';
 import { LATEST_ANNOUNCEMENT } from './data/announcementData';
@@ -25,6 +26,7 @@ const ACTIVE_PLAN_KEY = 'uni_schedule_active_plan_v3';
 const CATALOG_STORAGE_KEY = 'unischedule_catalog_courses';
 const STUDENT_INFO_KEY = 'unischedule_student_info';
 const DISMISSED_ANNOUNCEMENT_KEY = 'unischedule_dismissed_announcement_id';
+const DISMISSED_DONATION_KEY = 'unischedule_dismissed_donation_announcement_v1';
 
 export default function App() {
   // Navigation
@@ -134,6 +136,26 @@ export default function App() {
     return true;
   });
 
+  // Donation Modal State (guaranteed to never show simultaneously with announcement)
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+
+  // If update announcement is NOT open initially, check if donation announcement should be shown
+  useEffect(() => {
+    if (!isAnnouncementOpen) {
+      try {
+        const donationDismissed = localStorage.getItem(DISMISSED_DONATION_KEY) === 'true';
+        if (!donationDismissed) {
+          const timer = setTimeout(() => {
+            setIsDonationModalOpen(true);
+          }, 600);
+          return () => clearTimeout(timer);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
   const handleCloseAnnouncement = (dontShowAgain: boolean) => {
     setIsAnnouncementOpen(false);
     try {
@@ -145,13 +167,44 @@ export default function App() {
     } catch (e) {
       console.error('Failed to save announcement dismissal state to localStorage', e);
     }
+
+    // Sequence: When update announcement closes, show donation announcement if eligible
+    try {
+      const isDonationDismissed = localStorage.getItem(DISMISSED_DONATION_KEY) === 'true';
+      if (!isDonationDismissed) {
+        setTimeout(() => {
+          setIsDonationModalOpen(true);
+        }, 350);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleCloseDonationModal = (dontShowAgain?: boolean) => {
+    setIsDonationModalOpen(false);
+    try {
+      if (dontShowAgain) {
+        localStorage.setItem(DISMISSED_DONATION_KEY, 'true');
+      } else {
+        localStorage.removeItem(DISMISSED_DONATION_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save donation dismissal state to localStorage', e);
+    }
   };
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formModalTab, setFormModalTab] = useState<'details' | 'sessions' | 'exam'>('details');
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [isEmptyCatalogAlertOpen, setIsEmptyCatalogAlertOpen] = useState(false);
-  const [catalogFilterSlot, setCatalogFilterSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
+  const [catalogFilterSlot, setCatalogFilterSlot] = useState<{ 
+    day: DayOfWeek; 
+    startTime: string; 
+    endTime: string; 
+    hideConflicting?: boolean; 
+    sourceCourseName?: string; 
+  } | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [prefilledSlot, setPrefilledSlot] = useState<{ day: DayOfWeek; startTime: string; endTime: string } | null>(null);
 
@@ -495,6 +548,7 @@ export default function App() {
         isDarkMode={isDarkMode}
         toggleDarkMode={() => setIsDarkMode((prev) => !prev)}
         isPreviewMode={Boolean(previewPlan)}
+        onOpenDonation={() => setIsDonationModalOpen(true)}
       />
 
       {/* Main Content Area: 100% Fluid Width */}
@@ -623,12 +677,12 @@ export default function App() {
                   setFormModalTab('details');
                   setIsFormModalOpen(true);
                 }}
-                onSelectGapFromCatalog={(day, startTime, endTime) => {
+                onSelectGapFromCatalog={(day, startTime, endTime, hideConflicting = true, sourceCourseName) => {
                   if (catalogCourses.length === 0) {
                     setIsEmptyCatalogAlertOpen(true);
                     return;
                   }
-                  setCatalogFilterSlot({ day, startTime, endTime });
+                  setCatalogFilterSlot({ day, startTime, endTime, hideConflicting, sourceCourseName });
                   setIsCatalogModalOpen(true);
                 }}
                 showFriday={showFriday}
@@ -675,7 +729,10 @@ export default function App() {
         )}
 
         {/* Footer always visible on all tabs */}
-        <Footer onOpenAnnouncement={() => setIsAnnouncementOpen(true)} />
+        <Footer 
+          onOpenAnnouncement={() => setIsAnnouncementOpen(true)} 
+          onOpenDonation={() => setIsDonationModalOpen(true)}
+        />
       </main>
 
       {/* Floating Add/Edit Course Modal */}
@@ -825,8 +882,22 @@ export default function App() {
           isOpen={Boolean(shareModalPlan)}
           plan={shareModalPlan}
           onClose={() => setShareModalPlan(null)}
+          onOpenDonation={() => setIsDonationModalOpen(true)}
         />
       )}
+
+      {/* Donation & Support Modal */}
+      <DonationModal
+        isOpen={isDonationModalOpen}
+        isDismissed={(() => {
+          try {
+            return localStorage.getItem(DISMISSED_DONATION_KEY) === 'true';
+          } catch {
+            return false;
+          }
+        })()}
+        onClose={handleCloseDonationModal}
+      />
 
       {/* Global In-App Confirm Modal */}
       <ConfirmModal

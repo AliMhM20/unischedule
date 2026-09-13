@@ -11,7 +11,13 @@ interface TimetableGridProps {
   onEditCourse: (course: Course) => void;
   onDeleteCourse: (courseId: string) => void;
   onAddCourseAtSlot: (day: DayOfWeek, startTime: string, endTime: string) => void;
-  onSelectGapFromCatalog?: (day: DayOfWeek, startTime: string, endTime: string) => void;
+  onSelectGapFromCatalog?: (
+    day: DayOfWeek, 
+    startTime: string, 
+    endTime: string, 
+    hideConflicting?: boolean, 
+    sourceCourseName?: string
+  ) => void;
   showFriday: boolean;
   onToggleFriday: () => void;
   isPreviewMode?: boolean;
@@ -262,7 +268,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
         <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-emerald-950/40 border-b border-indigo-100 dark:border-emerald-800/40 px-4 py-2 flex items-center justify-between gap-2 text-xs font-bold text-indigo-900 dark:text-emerald-300 animate-in fade-in duration-150">
           <div className="flex items-center gap-2 truncate">
             <Sparkles className="w-4 h-4 text-indigo-600 dark:text-emerald-400 shrink-0 animate-pulse" />
-            <span className="truncate">حالت انتخاب از بانک دروس فعال است: روی هر یک از بازه‌های خالی جدول کلیک کنید تا دروس متناسب با آن زمان نمایش داده شوند.</span>
+            <span className="truncate">حالت انتخاب از بانک دروس فعال است: روی بازه‌های خالی یا کارت هر درس کلیک کنید تا دروس متناسب در بانک نمایش داده شوند.</span>
           </div>
           <button
             type="button"
@@ -464,14 +470,60 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                         style={style}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedCourseCard({ course, session });
+                          if (isCatalogSelectMode) {
+                            if (onSelectGapFromCatalog) {
+                              onSelectGapFromCatalog(session.day, session.startTime, session.endTime, false, course.name);
+                            }
+                          } else {
+                            setSelectedCourseCard({ course, session });
+                          }
                         }}
                         className={`course-card-item absolute inset-y-1 sm:inset-y-1.5 rounded-lg sm:rounded-xl p-1.5 sm:p-2 transition-all shadow-2xs hover:shadow-md cursor-pointer border flex flex-col justify-between overflow-hidden group/card z-10 ${
-                          isConflicted
+                          isCatalogSelectMode
+                            ? 'ring-2 ring-indigo-500 dark:ring-[#00B87C] border-indigo-400 dark:border-[#00B87C] shadow-sm hover:scale-[1.01] hover:z-30'
+                            : isConflicted
                             ? 'bg-rose-50 border-rose-400 text-rose-900 ring-2 ring-rose-300'
                             : theme.lightBg
                         }`}
                       >
+                        {/* Interactive Catalog Mode Badge */}
+                        {isCatalogSelectMode && (
+                          <div className="absolute top-1 left-1 z-15 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-600/90 text-white dark:bg-[#00B87C] dark:text-black font-extrabold text-[9px] sm:text-[10px] shadow-xs pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                            <Sparkles className="w-2.5 h-2.5 animate-pulse" />
+                            <span className="hidden sm:inline">بانک دروس</span>
+                          </div>
+                        )}
+
+                        {/* Interactive Catalog Mode Hover Overlay */}
+                        {isCatalogSelectMode && (
+                          <div className="absolute inset-0 bg-slate-900/90 dark:bg-black/90 backdrop-blur-xs rounded-lg sm:rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center text-center gap-1 text-white opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 z-20">
+                            <div className="flex items-center gap-1.5 text-indigo-300 dark:text-[#00B87C] text-[11px] sm:text-xs font-black">
+                              <Sparkles className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                              <span>جستجو در بانک دروس</span>
+                            </div>
+                            <span className="text-[10px] sm:text-[11px] font-bold text-white/95" dir="ltr">
+                              {toPersianDigits(session.startTime)} - {toPersianDigits(session.endTime)}
+                            </span>
+                            <span className="text-[8.5px] sm:text-[9.5px] text-slate-300 dark:text-slate-300 bg-white/15 px-2 py-0.5 rounded-full font-medium">
+                              مشاهده تمام گزینه‌های این زمان
+                            </span>
+
+                            {/* Info button if user wants to see details/edit/delete instead */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCourseCard({ course, session });
+                              }}
+                              className="mt-0.5 px-2 py-0.5 rounded-md bg-white/20 hover:bg-white/30 text-white text-[9px] sm:text-[10px] flex items-center gap-1 font-bold cursor-pointer transition-colors"
+                              title="مشاهده مشخصات یا حذف درس"
+                            >
+                              <Info className="w-2.5 h-2.5" />
+                              <span>مشخصات درس</span>
+                            </button>
+                          </div>
+                        )}
+
                         {/* Course Name & Credits */}
                         <div>
                           <div className="flex items-start justify-between gap-1">
@@ -621,32 +673,51 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             </div>
 
             {!isPreviewMode ? (
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#2a2b30]">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-[#2a2b30] flex-wrap">
                 <button
                   type="button"
                   onClick={() => {
+                    const s = selectedCourseCard.session;
                     const c = selectedCourseCard.course;
                     setSelectedCourseCard(null);
-                    onDeleteCourse(c.id);
+                    if (onSelectGapFromCatalog) {
+                      onSelectGapFromCatalog(s.day, s.startTime, s.endTime, false, c.name);
+                    }
                   }}
-                  className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-2 text-xs font-bold text-indigo-700 dark:text-emerald-400 bg-indigo-50 dark:bg-emerald-950/60 hover:bg-indigo-100 dark:hover:bg-emerald-900/40 border border-indigo-200 dark:border-emerald-800/50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="جستجوی تمام دروس ارائه‌شده در این ساعت در بانک دروس"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  حذف درس
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>جستجو در بانک دروس</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const c = selectedCourseCard.course;
-                    setSelectedCourseCard(null);
-                    onEditCourse(c);
-                  }}
-                  className="px-4 py-2 text-xs font-bold text-white dark:text-black bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] rounded-xl transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  ویرایش کامل
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = selectedCourseCard.course;
+                      setSelectedCourseCard(null);
+                      onDeleteCourse(c.id);
+                    }}
+                    className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    حذف درس
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = selectedCourseCard.course;
+                      setSelectedCourseCard(null);
+                      onEditCourse(c);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-white dark:text-black bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] rounded-xl transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    ویرایش کامل
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-[#2a2b30]">
@@ -723,10 +794,10 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                 </div>
                 <div>
                   <h4 className="font-extrabold text-slate-900 dark:text-slate-100 mb-0.5">
-                    کلیک روی بازه خالی دلخواه (گپ زمانی)
+                    کلیک روی بازه خالی (گپ زمانی) یا روی کارت درس‌ها
                   </h4>
                   <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
-                    با حرکت ماوس روی جدول، بازه‌های خالی بین کلاس‌ها یا قبل و بعد آنها با کادر مشخص و ساعت دقیق نمایش داده می‌شوند. کافیست روی گپ موردنظر کلیک کنید.
+                    می‌توانید روی بازه‌های خالی یا حتی روی کارت درس‌های فعلی کلیک کنید تا تمام دروس ارائه‌شده در آن زمان در بانک دروس نمایش داده شوند.
                   </p>
                 </div>
               </div>
@@ -741,7 +812,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                     مشاهده و اخذ فوری دروس متناسب
                   </h4>
                   <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
-                    بانک دروس به طور خودکار با فیلتر همان روز، بازه ساعتی و پنهان‌سازی دروس متداخل باز می‌شود و فقط درس‌های قابل اخذ را نمایش می‌دهد.
+                    بانک دروس به طور خودکار با فیلتر همان روز و بازه ساعتی باز می‌شود. در صورت کلیک روی بازه خالی، دروس دارای تداخل پنهان می‌شوند و در صورت کلیک روی کارت درس فعلی، تیک پنهان‌سازی برداشته می‌شود تا گزینه‌های جایگزین را مشاهده کنید.
                   </p>
                 </div>
               </div>
@@ -750,7 +821,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               <div className="p-3 rounded-2xl bg-indigo-50/70 dark:bg-emerald-950/30 border border-dashed border-indigo-200 dark:border-emerald-800/50 text-[11.5px] text-indigo-950 dark:text-emerald-200 space-y-1">
                 <span className="font-extrabold block">💡 نکته هوشمند:</span>
                 <p>
-                  تیک «پنهان‌سازی دروس دارای تداخل» به صورت خودکار فعال می‌شود تا بدون اتلاف وقت، دروس مناسب را انتخاب نمایید.
+                  برای گپ‌های خالی، تیک «پنهان‌سازی دروس دارای تداخل» فعال می‌شود تا دروس قابل اخذ نشان داده شوند؛ اما برای کارت‌های درس فعلی این تیک برداشته می‌شود تا بتوانید تمام دروس هم‌زمان آن بازه را بررسی یا جایگزین نمایید.
                 </p>
               </div>
 

@@ -2,18 +2,20 @@ import React, { useState, useMemo } from 'react';
 import { SchedulePlan } from '../types/schedule';
 import { getShareUrl } from '../utils/shareUtils';
 import { toPersianDigits } from '../utils/timeUtils';
-import { Share2, Copy, Check, X, Link, FileText, Sparkles } from 'lucide-react';
+import { Share2, Copy, Check, X, Link, FileText, Sparkles, Coffee } from 'lucide-react';
 
 interface ShareModalProps {
   isOpen: boolean;
   plan: SchedulePlan;
   onClose: () => void;
+  onOpenDonation?: () => void;
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   plan,
   onClose,
+  onOpenDonation,
 }) => {
   const [includeNotes, setIncludeNotes] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
@@ -170,6 +172,32 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Support Callout */}
+        {onOpenDonation && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 dark:from-amber-950/30 dark:via-orange-950/30 dark:to-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Coffee className="w-4 h-4" />
+              </div>
+              <div className="text-right min-w-0 flex-1">
+                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">
+                  از یونی‌اسکجول خوشت اومده؟
+                </span>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400 block mt-0.5 leading-snug break-words">
+                  می‌تونی با یه قهوه از ادامه‌ی توسعه حمایت کنی ☕
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenDonation}
+              className="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-black transition-all shrink-0 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              یه قهوه مهمونم کن
+            </button>
+          </div>
+        )}
 
         {/* Footer Actions */}
         <div className="flex items-center justify-end pt-3 border-t border-slate-100 dark:border-[#2a2b30]">

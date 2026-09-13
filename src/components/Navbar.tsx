@@ -3,7 +3,7 @@ import {
   LayoutGrid, Plus, Printer, 
   HelpCircle, Layers, Moon, Sun,
   ArrowUpCircle, ChevronDown, Check,
-  Pencil, Copy, Trash2, PlusCircle, Share2
+  Pencil, Copy, Trash2, PlusCircle, Share2, Coffee
 } from 'lucide-react';
 import { SchedulePlan } from '../types/schedule';
 import { toPersianDigits } from '../utils/timeUtils';
@@ -24,6 +24,7 @@ interface NavbarProps {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   isPreviewMode?: boolean;
+  onOpenDonation?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -42,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDarkMode,
   toggleDarkMode,
   isPreviewMode = false,
+  onOpenDonation,
 }) => {
   const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
   const [isMobilePlanDropdownOpen, setIsMobilePlanDropdownOpen] = useState(false);
@@ -307,6 +309,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Printer className="w-4 h-4" />
           </button>
+
+          {/* Donation / Support Button */}
+          {onOpenDonation && (
+            <button
+              type="button"
+              onClick={onOpenDonation}
+              title="یه قهوه مهمونم کن (حمایت مالی از پروژه)"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 md:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-700 dark:text-amber-400 border border-amber-300/70 dark:border-amber-700/60 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer shrink-0"
+            >
+              <Coffee className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden md:inline whitespace-nowrap">حمایت مالی</span>
+            </button>
+          )}
 
           {/* Primary Action Button */}
           {!isPreviewMode && (

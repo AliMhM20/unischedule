@@ -3,10 +3,10 @@ import { Course, DayOfWeek } from '../types/schedule';
 import { 
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
-  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw,
+  Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw, RotateCcw,
   Clock, AlertTriangle, SlidersHorizontal, Calendar
 } from 'lucide-react';
-import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity } from '../utils/parsers';
+import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity, detectCandidateUniversities, validateUniversitySchema, UniversityInfo } from '../utils/parsers';
 import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
 import { validateCourse, toPersianDigits, getDayFaName, formatExamDate, getCourseTheme, isSameCourse, checkDuplicateGroupWarning } from '../utils/timeUtils';
 import { TimetableGrid } from './TimetableGrid';
@@ -38,8 +38,23 @@ import nitImage3 from '../../assets/Help Photos/nit/image3.png';
 import nitImage4 from '../../assets/Help Photos/nit/image4.png';
 import nitImage5 from '../../assets/Help Photos/nit/image5.png';
 
+// SBU Help Photos
+import sbuImage1 from '../../assets/Help Photos/sbu/image1.png';
+import sbuImage2 from '../../assets/Help Photos/sbu/image2.png';
+import sbuImage3 from '../../assets/Help Photos/sbu/image3.png';
+import sbuImage4 from '../../assets/Help Photos/sbu/image4.png';
+import sbuImage5 from '../../assets/Help Photos/sbu/image5.png';
+
 import { GenderBadge } from './GenderBadge';
 import { ConfirmModal, ConfirmModalConfig } from './ConfirmModal';
+
+export interface CatalogFilterSlot {
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  hideConflicting?: boolean;
+  sourceCourseName?: string;
+}
 
 interface CourseCatalogModalProps {
   isOpen: boolean;
@@ -52,7 +67,7 @@ interface CourseCatalogModalProps {
   setCatalogCourses: (courses: Course[]) => void;
   studentInfo: { name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null;
   setStudentInfo: (info: { name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null) => void;
-  initialFilterSlot?: { day: DayOfWeek; startTime: string; endTime: string } | null;
+  initialFilterSlot?: CatalogFilterSlot | null;
   showFriday?: boolean;
   onToggleFriday?: () => void;
   onEditCourse?: (course: Course) => void;
@@ -88,6 +103,12 @@ const generateTimeSlots = (startH: number, startM: number, endH: number, endM: n
 };
 
 const TIME_FILTER_HOURS = generateTimeSlots(7, 0, 21, 0);
+
+// Helper to remove duplicate "دانشگاه " prefix for clean quotes rendering
+const cleanUnivName = (name?: string): string => {
+  if (!name) return '';
+  return name.replace(/^دانشگاه\s+/, '').trim();
+};
 
 export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   isOpen,
@@ -126,8 +147,12 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
   // University Mismatch Modal Alert
   const [universityMismatchModal, setUniversityMismatchModal] = useState<{
-    currentUnivName: string;
-    detectedUnivName: string;
+    htmlContent: string;
+    targetUnivId: UniversityId;
+    targetUnivName: string;
+    detectedUnivName?: string;
+    candidates: UniversityInfo[];
+    isAppend: boolean;
   } | null>(null);
 
   // Dual Personality / Student Identity Conflict Modal
@@ -178,7 +203,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     }
   });
 
-  // Auto-apply initial filter slot if opened from Timetable Gap selection
+  // Auto-apply initial filter slot if opened from Timetable Gap/Course selection
   useEffect(() => {
     if (isOpen && initialFilterSlot) {
       setSelectedDay(initialFilterSlot.day);
@@ -186,11 +211,20 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       setTimeFilterEnd(initialFilterSlot.endTime);
       setIsTimeFilterActive(true);
       setTimeFilterError(null);
-      setHideConflictingCourses(true);
+      
+      const shouldHide = initialFilterSlot.hideConflicting !== undefined 
+        ? initialFilterSlot.hideConflicting 
+        : true;
+      setHideConflictingCourses(shouldHide);
       try {
-        localStorage.setItem(HIDE_CONFLICTING_KEY, 'true');
+        localStorage.setItem(HIDE_CONFLICTING_KEY, String(shouldHide));
       } catch {
         // ignore
+      }
+
+      if (initialFilterSlot.sourceCourseName) {
+        setDetectedToast(`فیلتر زمانی برای بازه درس «${initialFilterSlot.sourceCourseName}» اعمال شد (پنهان‌سازی تداخل‌ها غیرفعال است).`);
+        setTimeout(() => setDetectedToast(null), 4000);
       }
     }
   }, [isOpen, initialFilterSlot]);
@@ -306,44 +340,82 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     return Array.from(set);
   }, [catalogCourses]);
 
-  // Sync stored raw HTML sources count
+  // Check if any filter is different from its default state
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery.trim().length > 0) count++;
+    if (selectedDay !== 'all') count++;
+    if (selectedFaculty !== 'all') count++;
+    if (genderFilter !== 'all') count++;
+    if (unitFilter !== 'all') count++;
+    if (visibilityFilter !== 'active') count++;
+    if (isTimeFilterActive) count++;
+    if (examFilter !== 'all') count++;
+    if (hideConflictingCourses) count++;
+    if (hideWarningCourses) count++;
+    return count;
+  }, [
+    searchQuery,
+    selectedDay,
+    selectedFaculty,
+    genderFilter,
+    unitFilter,
+    visibilityFilter,
+    isTimeFilterActive,
+    examFilter,
+    hideConflictingCourses,
+    hideWarningCourses
+  ]);
+
+  const isAnyFilterActive = activeFiltersCount > 0;
+
+  const handleResetAllFilters = () => {
+    setSearchQuery('');
+    setSelectedDay('all');
+    setSelectedFaculty('all');
+    setGenderFilter('all');
+    setUnitFilter('all');
+    setVisibilityFilter('active');
+    setExamFilter('all');
+    setIsTimeFilterActive(false);
+    setIsTimeFilterOpen(false);
+    setTimeFilterStart('07:00');
+    setTimeFilterEnd('20:00');
+    setTimeFilterError(null);
+    setHideConflictingCourses(false);
+    setHideWarningCourses(false);
+    try {
+      localStorage.setItem(HIDE_CONFLICTING_KEY, 'false');
+      localStorage.setItem(HIDE_WARNING_KEY, 'false');
+    } catch {
+      // ignore
+    }
+  };
+
+  // Sync stored raw HTML sources count across all merged university sources
   useEffect(() => {
     if (isOpen) {
-      getCatalogSourcesCount(activeUniversityId).then(count => {
+      getCatalogSourcesCount().then(count => {
         setStoredSourcesCount(count);
       }).catch(err => {
         console.warn('Failed to get catalog sources count', err);
       });
     }
-  }, [isOpen, activeUniversityId]);
+  }, [isOpen]);
 
-  const handleProcessHtml = (htmlContent: string) => {
+  // Core Parsing and Catalog State Update logic (supports Strategy B multi-university merging)
+  const executeParseAndSave = (
+    htmlContent: string, 
+    parseUnivId: UniversityId, 
+    isAppend: boolean, 
+    newActiveUnivId?: UniversityId
+  ) => {
     try {
-      if (!htmlContent || !htmlContent.trim()) {
-        setError('لطفاً محتوای فایل یا کد HTML را وارد کنید.');
-        return;
-      }
-
-      // Auto-detect university from HTML
-      const detectedUniv = detectUniversity(htmlContent);
-
-      if (isAppendMode && hasCatalog) {
-        // === APPEND MODE: Strict University Match Check ===
-        const currentId = activeUniversityId;
-        if (detectedUniv && detectedUniv !== currentId) {
-          const currentUniv = SUPPORTED_UNIVERSITIES.find(u => u.id === currentId)?.name || 'دانشگاه فعلی';
-          const incomingUniv = SUPPORTED_UNIVERSITIES.find(u => u.id === detectedUniv)?.name || 'دانشگاه دیگر';
-          setUniversityMismatchModal({
-            currentUnivName: currentUniv,
-            detectedUnivName: incomingUniv
-          });
-          return;
-        }
-
-        // Parse with current university driver
-        const result = parseUniversityHtml(htmlContent, currentId);
+      if (isAppend && hasCatalog) {
+        const result = parseUniversityHtml(htmlContent, parseUnivId);
         if (result.courses.length === 0) {
-          setError('هیچ درسی در فایل جدید یافت نشد. لطفاً مطمئن شوید فایل خروجی جدول گزارش ' + toPersianDigits(currentUnivObj.reportCode) + ' را انتخاب کرده‌اید.');
+          const univObj = SUPPORTED_UNIVERSITIES.find(u => u.id === parseUnivId);
+          setError('هیچ درسی در فایل جدید یافت نشد. لطفاً مطمئن شوید فایل خروجی جدول گزارش ' + toPersianDigits(univObj?.reportCode || '') + ' را انتخاب کرده‌اید.');
           return;
         }
 
@@ -358,10 +430,17 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
           setDetectedToast('هیچ درس جدیدی اضافه نشد (تمام دروس فایل انتخابی قبلاً در بانک دروس موجود بودند).');
         }
 
-        // Save raw HTML to stored sources
-        appendCatalogSource(currentId, htmlContent).then(() => {
+        // Save raw HTML to stored sources with its specific parser universityId
+        appendCatalogSource(parseUnivId, htmlContent).then(() => {
           setStoredSourcesCount(prev => prev + 1);
         }).catch(e => console.warn('Could not store source', e));
+
+        const effectiveActiveUniv = newActiveUnivId || activeUniversityId;
+        const effectiveUnivObj = SUPPORTED_UNIVERSITIES.find(u => u.id === effectiveActiveUniv);
+
+        if (newActiveUnivId) {
+          setSelectedUniv(newActiveUnivId);
+        }
 
         // Check for different student identity in AUT or similar portals (Dual Personality Easter Egg)
         const hasDifferentIdentity = 
@@ -373,16 +452,34 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
             currentStudent: {
               name: studentInfo?.name,
               id: studentInfo?.id,
-              universityName: studentInfo?.universityName || result.universityName,
-              universityId: studentInfo?.universityId || result.universityId,
+              universityName: effectiveUnivObj?.name || studentInfo?.universityName || result.universityName,
+              universityId: effectiveActiveUniv,
             },
             incomingStudent: {
               name: result.studentName,
               id: result.studentId,
-              universityName: result.universityName || studentInfo?.universityName,
-              universityId: result.universityId || studentInfo?.universityId,
+              universityName: effectiveUnivObj?.name || result.universityName || studentInfo?.universityName,
+              universityId: effectiveActiveUniv,
             },
             selectedChoice: 'incoming',
+          });
+        } else {
+          setStudentInfo(prev => {
+            if (!prev) {
+              return {
+                name: result.studentName,
+                id: result.studentId,
+                universityName: effectiveUnivObj?.name,
+                universityId: effectiveActiveUniv
+              };
+            }
+            return {
+              ...prev,
+              name: prev.name || result.studentName,
+              id: prev.id || result.studentId,
+              universityId: effectiveActiveUniv,
+              universityName: effectiveUnivObj?.name || prev.universityName
+            };
           });
         }
 
@@ -393,23 +490,16 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
       } else {
         // === FRESH / REPLACE MODE ===
-        const activeUniv: UniversityId = detectedUniv || selectedUniv;
-
-        if (detectedUniv) {
-          setSelectedUniv(detectedUniv);
-          const univObj = SUPPORTED_UNIVERSITIES.find(u => u.id === detectedUniv);
-          setDetectedToast(`سامانه ${univObj?.name || ''} به صورت خودکار شناسایی شد.`);
-          setTimeout(() => setDetectedToast(null), 4000);
-        }
-
-        const result = parseUniversityHtml(htmlContent, activeUniv);
+        const finalUnivId = newActiveUnivId || parseUnivId;
+        setSelectedUniv(finalUnivId);
+        const result = parseUniversityHtml(htmlContent, finalUnivId);
         if (result.courses.length === 0) {
           setError('هیچ درسی در فایل یافت نشد. لطفاً مطمئن شوید فایل خروجی نمایش جدولی را به درستی انتخاب کرده‌اید.');
           return;
         }
 
         // Save fresh source to storage
-        saveFreshCatalogSource(activeUniv, htmlContent).then(() => {
+        saveFreshCatalogSource(finalUnivId, htmlContent).then(() => {
           setStoredSourcesCount(1);
         }).catch(e => console.warn('Could not store source', e));
 
@@ -427,8 +517,8 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         setStudentInfo({
           name: result.studentName,
           id: result.studentId,
-          universityName: result.universityName,
-          universityId: result.universityId
+          universityName: result.universityName || SUPPORTED_UNIVERSITIES.find(u => u.id === finalUnivId)?.name,
+          universityId: result.universityId || finalUnivId
         });
 
         setDetectedToast(`تعداد ${toPersianDigits(deduplicatedCourses.length)} درس با موفقیت بارگذاری شد.`);
@@ -446,12 +536,63 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
     }
   };
 
-  // Reload catalog from all stored raw HTML sources
+  const handleProcessHtml = (htmlContent: string) => {
+    try {
+      if (!htmlContent || !htmlContent.trim()) {
+        setError('لطفاً محتوای فایل یا کد HTML را وارد کنید.');
+        return;
+      }
+
+      const isAppend = isAppendMode && hasCatalog;
+      const targetUnivId = isAppend ? activeUniversityId : selectedUniv;
+      const targetUnivObj = SUPPORTED_UNIVERSITIES.find(u => u.id === targetUnivId);
+      const targetUnivName = targetUnivObj?.name || 'دانشگاه انتخابی';
+
+      // Validate schema against target university selected by user
+      const isValid = validateUniversitySchema(htmlContent, targetUnivId);
+
+      if (!isValid) {
+        // Detect candidate universities that match this HTML schema
+        const allCandidates = detectCandidateUniversities(htmlContent);
+        const otherCandidates = allCandidates.filter(u => u.id !== targetUnivId);
+
+        let detectedName: string | undefined = undefined;
+        if (otherCandidates.length > 0) {
+          const ids = new Set(otherCandidates.map(c => c.id));
+          if (ids.has('kntu') && ids.has('sbu')) {
+            detectedName = 'خواجه‌نصیرالدین طوسی یا شهید بهشتی';
+          } else if (ids.has('aut') && ids.has('sbu')) {
+            detectedName = 'صنعتی امیرکبیر یا شهید بهشتی';
+          } else {
+            detectedName = otherCandidates.map(c => c.name).join(' یا ');
+          }
+        }
+
+        setUniversityMismatchModal({
+          htmlContent,
+          targetUnivId,
+          targetUnivName,
+          detectedUnivName: detectedName,
+          candidates: otherCandidates,
+          isAppend
+        });
+        return;
+      }
+
+      // Schema matches selected university! Execute parsing directly
+      executeParseAndSave(htmlContent, targetUnivId, isAppend);
+
+    } catch (err) {
+      setError('خطا در پردازش فایل. لطفاً فایل جدول معتبر انتخاب کنید.');
+      console.error(err);
+    }
+  };
+
+  // Reload catalog from all stored raw HTML sources across merged universities
   const handleReloadCatalogFromSources = async () => {
     try {
       setIsReloadingSources(true);
-      const targetUniv = hasCatalog ? activeUniversityId : selectedUniv;
-      const sources = await getCatalogSources(targetUniv);
+      const sources = await getCatalogSources();
 
       if (sources.length === 0) {
         setDetectedToast('هیچ منبع فایلی برای بارگذاری مجدد در حافظه یافت نشد.');
@@ -491,6 +632,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       setCatalogCourses(allCourses);
       if (latestStudent) {
         setStudentInfo(latestStudent);
+        if (latestStudent.universityId) {
+          setSelectedUniv(latestStudent.universityId);
+        }
       }
       setSelectedCourseIds(new Set());
       setUploadMode('none');
@@ -1282,6 +1426,61 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                       </div>
                     )}
 
+                    {/* SBU SPECIFIC GUIDE */}
+                    {currentUnivObj.id === 'sbu' && (
+                      <div className="space-y-6 animate-in fade-in duration-150">
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۱. وارد پورتال آموزشی بهستان (بهشتی) شوید.</p>
+                          <p className="leading-relaxed font-medium">۲. در قسمت جست و جو، کد <strong>102</strong> یا <strong>212</strong> را وارد کنید و <strong>Enter</strong> بزنید.</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                            (توجه: پیشنهاد ما استفاده از کد گزارش 102 است)
+                          </p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={sbuImage1} alt="جستجوی کد گزارش بهشتی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <p className="leading-relaxed font-medium">
+                            ۳. اگر کد <strong>212</strong> را وارد کرده‌اید، در پنجره جدید لیست دروس خود را مشاهده می‌کنید. پایین لیست روی دکمه <strong>"نمایش جدولی"</strong> کلیک کنید.
+                            <br />
+                            اگر کد <strong>102</strong> را وارد کرده‌اید، فیلترهای مدنظر برای دروس مدنظر را انتخاب کرده و در آخر روی دکمه <strong>"مشاهده گزارش"</strong> بزنید. در پنجره جدید لیست دروس خود را مشاهده می‌کنید. پایین لیست روی دکمه <strong>"نمایش جدولی"</strong> کلیک کنید.
+                          </p>
+                          <div className="space-y-3 max-w-lg">
+                            <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs">
+                              <img src={sbuImage2} alt="انتخاب فیلترها و مشاهده گزارش بهشتی" className="w-full h-auto" />
+                            </div>
+                            <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs">
+                              <img src={sbuImage3} alt="دکمه نمایش جدولی بهشتی" className="w-full h-auto" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۴. روی صفحه جدید باز شده راست کلیک کنید و گزینه <strong>"inspect"</strong> را انتخاب کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={sbuImage4} alt="Inspect صفحه بهشتی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="leading-relaxed font-medium">۵. در صفحه جدید کد html ای مشاهده میکنید. روی خط اول کد ( <strong>&lt;html&gt;</strong> ) راست کلیک کنید و در قسمت <strong>Copy</strong>، روی <strong>Copy outerHTML</strong> کلیک کنید.</p>
+                          <div className="rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/50 shadow-xs max-w-lg">
+                            <img src={sbuImage5} alt="کپی outerHTML بهشتی" className="w-full h-auto" />
+                          </div>
+                        </div>
+
+                        <div className="bg-blue-100/70 dark:bg-blue-900/40 p-4 sm:p-5 rounded-2xl border border-blue-200 dark:border-blue-800/60 text-sm sm:text-[15px] leading-relaxed sm:leading-7 font-medium text-blue-950 dark:text-blue-100 space-y-2">
+                          <p>
+                            ۶. کد html درون کلیپ بورد شما کپی شده. میتوانید کد را مستقیما درون قسمت مشخص شده paste کنید و یا میتوانید درون کامپیوتر خود فایل تکست ساخته و محتوای کد را درون آن paste کرده و در آخر فایل را با پسوند <strong>html.</strong> ذخیره کنید و فایل ساخته شده را در قسمت مشخص شده آپلود کنید.
+                          </p>
+                          <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300 font-bold">
+                            (از مرورگرهای Microsoft Edge/Google Chrome برای وارد شدن به پورتال اموزشی استفاده کنید. مشکلاتی در حین استفاده از مرورگر Mozilla Firefox گزارش شده.)
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </details>
               </div>
@@ -1725,53 +1924,76 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
                 </div>
 
-                {/* Filter Checkbox Toggles (Hide Conflicting & Hide Warnings) */}
-                <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
-                  {/* Hide Conflicting Courses Checkbox */}
-                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
-                    hideConflictingCourses
-                      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 shadow-xs'
-                      : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={hideConflictingCourses}
-                      onChange={(e) => handleToggleHideConflicting(e.target.checked)}
-                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle className={`w-3.5 h-3.5 ${hideConflictingCourses ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`} />
-                      <span className="font-bold">پنهان‌سازی دروس دارای تداخل زمانی</span>
-                      {conflictingCoursesCount > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-extrabold">
-                          {toPersianDigits(conflictingCoursesCount)}
-                        </span>
-                      )}
-                    </div>
-                  </label>
+                {/* Filter Checkbox Toggles (Hide Conflicting & Hide Warnings) & Reset All Filters */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 text-xs">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Hide Conflicting Courses Checkbox */}
+                    <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      hideConflictingCourses
+                        ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={hideConflictingCourses}
+                        onChange={(e) => handleToggleHideConflicting(e.target.checked)}
+                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className={`w-3.5 h-3.5 ${hideConflictingCourses ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`} />
+                        <span className="font-bold">پنهان‌سازی دروس دارای تداخل زمانی</span>
+                        {conflictingCoursesCount > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-extrabold">
+                            {toPersianDigits(conflictingCoursesCount)}
+                          </span>
+                        )}
+                      </div>
+                    </label>
 
-                  {/* Hide Warning Courses Checkbox */}
-                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
-                    hideWarningCourses
-                      ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 shadow-xs'
-                      : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={hideWarningCourses}
-                      onChange={(e) => handleToggleHideWarnings(e.target.checked)}
-                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className={`w-3.5 h-3.5 ${hideWarningCourses ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`} />
-                      <span className="font-bold">پنهان‌سازی دروس دارای هشدار (گروه موازی)</span>
-                      {warningCoursesCount > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-extrabold">
-                          {toPersianDigits(warningCoursesCount)}
-                        </span>
-                      )}
-                    </div>
-                  </label>
+                    {/* Hide Warning Courses Checkbox */}
+                    <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      hideWarningCourses
+                        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={hideWarningCourses}
+                        onChange={(e) => handleToggleHideWarnings(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className={`w-3.5 h-3.5 ${hideWarningCourses ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`} />
+                        <span className="font-bold">پنهان‌سازی دروس دارای هشدار (گروه موازی)</span>
+                        {warningCoursesCount > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-extrabold">
+                            {toPersianDigits(warningCoursesCount)}
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Reset All Filters Button */}
+                  <button
+                    type="button"
+                    disabled={!isAnyFilterActive}
+                    onClick={handleResetAllFilters}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold text-xs transition-all ${
+                      isAnyFilterActive
+                        ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 shadow-2xs cursor-pointer active:scale-95'
+                        : 'bg-slate-50 dark:bg-[#131416] border-slate-200 dark:border-[#2a2b30] text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50'
+                    }`}
+                    title={isAnyFilterActive ? `بازنشانی تمام ${toPersianDigits(activeFiltersCount)} فیلتر فعال به حالت پیش‌فرض` : 'تمام فیلترها روی حالت پیش‌فرض هستند'}
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isAnyFilterActive ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-600'}`} />
+                    <span>ریست تمام فیلترها</span>
+                    {isAnyFilterActive && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-200/80 dark:bg-rose-900/80 text-rose-900 dark:text-rose-200 font-extrabold">
+                        {toPersianDigits(activeFiltersCount)}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 {/* Batch Bar & Select All Header */}
@@ -2193,11 +2415,21 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   onEditCourse={onEditCourse || (() => {})}
                   onDeleteCourse={onRemoveCourse}
                   onAddCourseAtSlot={() => {}}
-                  onSelectGapFromCatalog={(day, startTime, endTime) => {
+                  onSelectGapFromCatalog={(day, startTime, endTime, hideConflicting = true, sourceCourseName) => {
                     setSelectedDay(day);
                     setTimeFilterStart(startTime);
                     setTimeFilterEnd(endTime);
                     setIsTimeFilterActive(true);
+                    setHideConflictingCourses(hideConflicting);
+                    try {
+                      localStorage.setItem(HIDE_CONFLICTING_KEY, String(hideConflicting));
+                    } catch {
+                      // ignore
+                    }
+                    if (sourceCourseName) {
+                      setDetectedToast(`فیلتر زمانی برای بازه درس «${sourceCourseName}» اعمال شد (پنهان‌سازی تداخل‌ها غیرفعال است).`);
+                      setTimeout(() => setDetectedToast(null), 4000);
+                    }
                     setActiveCatalogTab('list');
                   }}
                   showFriday={showFriday ?? false}
@@ -2212,32 +2444,86 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
         </div>
       </div>
 
-      {/* University Mismatch Modal Popup */}
+      {/* University Schema Mismatch Warning Modal Popup */}
       {universityMismatchModal && (
         <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200" dir="rtl">
-          <div className="bg-white dark:bg-[#18191d] rounded-3xl max-w-md w-full p-6 border border-rose-200 dark:border-rose-900/50 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto border border-rose-200 dark:border-rose-800/40">
-              <ShieldAlert className="w-6 h-6" />
+          <div className="bg-white dark:bg-[#18191d] rounded-3xl max-w-md w-full p-6 border border-amber-300 dark:border-amber-800/50 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setUniversityMismatchModal(null);
+                setError(null);
+              }}
+              className="absolute top-4 left-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#25262c] transition-colors cursor-pointer"
+              title="انصراف و بستن"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800/40">
+              <AlertTriangle className="w-6 h-6" />
             </div>
             
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-2.5">
               <h4 className="text-base font-black text-slate-900 dark:text-slate-100">
-                عدم امکان ترکیب دروس دانشگاه‌ها
+                هشدار عدم تطابق فایل با دانشگاه انتخابی
               </h4>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                بانک دروس فعلی شما مربوط به <strong>«{universityMismatchModal.currentUnivName}»</strong> است، اما فایل انتخابی مربوط به <strong>«{universityMismatchModal.detectedUnivName}»</strong> می‌باشد.
+
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                سیستم تشخیص خودکار دانشگاه متوجه شده این فایل مربوط به دانشگاه <strong>«{cleanUnivName(universityMismatchModal.targetUnivName)}»</strong> انتخاب‌شده توسط شما نیست.
               </p>
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 p-3 rounded-xl text-amber-900 dark:text-amber-200 text-xs font-medium leading-relaxed text-right mt-2">
-                💡 امکان ترکیب همزمان دروس دانشگاه‌های مختلف در یک کاتالوگ وجود ندارد. اگر قصد دارید دانشگاه را تغییر دهید، ابتدا از دکمه <strong>«تعویض فایل جدول»</strong> استفاده کنید.
-              </div>
+
+              {universityMismatchModal.detectedUnivName && (
+                <div className="bg-indigo-50 dark:bg-emerald-950/30 border border-indigo-100 dark:border-emerald-800/40 px-3.5 py-2.5 rounded-xl text-xs text-indigo-900 dark:text-emerald-300 font-bold flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400 shrink-0" />
+                  <span>ساختار فایل شبیه به: <strong>{universityMismatchModal.detectedUnivName}</strong></span>
+                </div>
+              )}
+
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-[#131416] p-2.5 rounded-xl border border-slate-200/70 dark:border-[#2a2b30]">
+                لطفاً دانشگاه خود را به درستی انتخاب کنید. (در صورت انتخاب دانشگاه به درستی و ادامه دار بودن این پیغام هشدار، به پشتیبانی تلگرام موضوع را منتقل کنید).
+              </p>
             </div>
 
-            <button
-              onClick={() => setUniversityMismatchModal(null)}
-              className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer mt-2"
-            >
-              متوجه شدم
-            </button>
+            <div className="flex flex-col gap-2 pt-1">
+              {universityMismatchModal.candidates.length > 0 && universityMismatchModal.candidates.map(cand => (
+                <button
+                  key={cand.id}
+                  type="button"
+                  onClick={() => {
+                    const { htmlContent, isAppend } = universityMismatchModal;
+                    setUniversityMismatchModal(null);
+                    setError(null);
+                    if (isAppend) {
+                      executeParseAndSave(htmlContent, cand.id, true, cand.id);
+                    } else {
+                      executeParseAndSave(htmlContent, cand.id, false);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-indigo-600 dark:bg-[#00B87C] hover:bg-indigo-700 dark:hover:bg-[#00d18d] text-white dark:text-black rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                >
+                  تعویض به {cand.name}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const { htmlContent, targetUnivId, candidates, isAppend } = universityMismatchModal;
+                  setUniversityMismatchModal(null);
+                  setError(null);
+                  if (isAppend) {
+                    const parseId = candidates.length > 0 ? candidates[0].id : targetUnivId;
+                    executeParseAndSave(htmlContent, parseId, true);
+                  } else {
+                    executeParseAndSave(htmlContent, targetUnivId, false);
+                  }
+                }}
+                className="w-full py-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-bold transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-[#25262c] rounded-xl border border-slate-200 dark:border-[#2a2b30]"
+              >
+                ادامه با همین دانشگاه ({cleanUnivName(universityMismatchModal.targetUnivName)})
+              </button>
+            </div>
           </div>
         </div>
       )}

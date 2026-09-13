@@ -17,14 +17,19 @@ export const normalizePersianText = (text: string): string => {
 };
 
 export const mapPersianDayToDayOfWeek = (dayName: string): DayOfWeek | null => {
-  const normalized = dayName.replace(/\s/g, '');
-  if (normalized.includes('شنبه') && !normalized.includes('یک') && !normalized.includes('دو') && !normalized.includes('سه') && !normalized.includes('چهار') && !normalized.includes('پنج')) return 'saturday';
-  if (normalized.includes('یکشنبه') || normalized.includes('يكشنبه')) return 'sunday';
+  if (!dayName) return null;
+  const normalized = dayName
+    .replace(/[\u200B\u200C\u200D\uFEFF\s]/g, '')
+    .replace(/ي/g, 'ی')
+    .replace(/ك/g, 'ک');
+
+  if (normalized.includes('یکشنبه')) return 'sunday';
   if (normalized.includes('دوشنبه')) return 'monday';
-  if (normalized.includes('سهشنبه') || normalized.includes('سه‌شنبه')) return 'tuesday';
+  if (normalized.includes('سهشنبه')) return 'tuesday';
   if (normalized.includes('چهارشنبه')) return 'wednesday';
-  if (normalized.includes('پنجشنبه') || normalized.includes('پنج‌شنبه')) return 'thursday';
+  if (normalized.includes('پنجشنبه')) return 'thursday';
   if (normalized.includes('جمعه')) return 'friday';
+  if (normalized.includes('شنبه')) return 'saturday';
   return null;
 };
 

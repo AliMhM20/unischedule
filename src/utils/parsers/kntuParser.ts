@@ -53,7 +53,7 @@ export function parseKntuBehestan(htmlContent: string): ParsedCatalog {
     const normalizedSessionsText = normalizePersianText(cleanSessionText);
 
     // Match all occurrences of (Day) ... (StartTime)-(EndTime) ... optional (Location)
-    const sessionRegex = /(شنبه|یک\s*شنبه|دوشنبه|سه\s*شنبه|چهار\s*شنبه|چهارشنبه|پنج\s*شنبه|پنجشنبه|جمعه)\s*[:\s]*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})(?:\s*(?:مکان|مكان|کلاس|كلاس)?\s*:?\s*([^،,;\n\r<]+))?/gi;
+    const sessionRegex = /(شنبه|یک[\s\u200c]*شنبه|دوشنبه|سه[\s\u200c]*شنبه|چهار[\s\u200c]*شنبه|پنج[\s\u200c]*شنبه|جمعه)\s*[:\s]*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})(?:\s*(?:مکان|مكان|کلاس|كلاس)?\s*:?\s*([^،,;\n\r<]+))?/gi;
 
     const sessions: ClassSession[] = [];
     let detectedLocation: string | undefined = undefined;
