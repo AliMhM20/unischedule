@@ -38,6 +38,7 @@ export interface Course {
   location?: string;
   gender?: 'mixed' | 'men' | 'women';
   isHidden?: boolean;
+  isStarred?: boolean;
   createdAt: number;
 }
 

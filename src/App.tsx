@@ -11,6 +11,7 @@ import { PlanModal } from './components/PlanModal';
 import { ShareModal } from './components/ShareModal';
 import { DonationModal } from './components/DonationModal';
 import { AnnouncementModal } from './components/AnnouncementModal';
+import { PrintScheduleModal } from './components/PrintScheduleModal';
 import { ConfirmModal, ConfirmModalConfig } from './components/ConfirmModal';
 import { LATEST_ANNOUNCEMENT } from './data/announcementData';
 import { Footer } from './components/Footer';
@@ -18,7 +19,8 @@ import { Course, DayOfWeek, SchedulePlan } from './types/schedule';
 import { INITIAL_SAMPLE_COURSES } from './utils/sampleData';
 import { toPersianDigits } from './utils/timeUtils';
 import { decodeSchedulePlan } from './utils/shareUtils';
-import { UniversityId } from './utils/parsers';
+import { UniversityId, parseUniversityHtml, SUPPORTED_UNIVERSITIES } from './utils/parsers';
+import { getCatalogSources } from './utils/catalogStorage';
 import { CheckCircle2, AlertCircle, BookOpen, Upload, X, Eye, Download, Share2, Sparkles } from 'lucide-react';
 
 const STORAGE_KEY = 'uni_schedule_plans_v3';
@@ -45,7 +47,14 @@ export default function App() {
   const [studentInfo, setStudentInfo] = useState<{ name?: string; id?: string; universityName?: string; universityId?: UniversityId } | null>(() => {
     try {
       const saved = localStorage.getItem(STUDENT_INFO_KEY);
-      return saved ? JSON.parse(saved) : null;
+      const parsed = saved ? JSON.parse(saved) : null;
+      const savedCatalog = localStorage.getItem(CATALOG_STORAGE_KEY);
+      const catalogParsed = savedCatalog ? JSON.parse(savedCatalog) : [];
+      if ((!catalogParsed || catalogParsed.length === 0) && parsed?.universityId) {
+        localStorage.removeItem(STUDENT_INFO_KEY);
+        return null;
+      }
+      return parsed;
     } catch (e) {
       return null;
     }
@@ -138,6 +147,21 @@ export default function App() {
 
   // Donation Modal State (guaranteed to never show simultaneously with announcement)
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+
+  // Print Schedule Modal State
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Intercept Ctrl+P / Cmd+P to open our print preview modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setIsPrintModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // If update announcement is NOT open initially, check if donation announcement should be shown
   useEffect(() => {
@@ -257,11 +281,39 @@ export default function App() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
       localStorage.setItem(ACTIVE_PLAN_KEY, activePlanId);
       localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(catalogCourses));
-      localStorage.setItem(STUDENT_INFO_KEY, JSON.stringify(studentInfo));
+      if (studentInfo) {
+        localStorage.setItem(STUDENT_INFO_KEY, JSON.stringify(studentInfo));
+      } else {
+        localStorage.removeItem(STUDENT_INFO_KEY);
+      }
     } catch (e) {
       console.error('Failed to save to localStorage', e);
     }
   }, [plans, activePlanId, catalogCourses, studentInfo]);
+
+  // Auto-restore studentInfo from catalog storage if catalog has courses but studentInfo is missing in state
+  useEffect(() => {
+    if (!studentInfo && catalogCourses.length > 0) {
+      getCatalogSources().then(sources => {
+        for (const src of sources) {
+          try {
+            const parsed = parseUniversityHtml(src.rawHtml, src.universityId);
+            if (parsed.studentName || parsed.studentId || parsed.universityName) {
+              setStudentInfo({
+                name: parsed.studentName,
+                id: parsed.studentId,
+                universityName: parsed.universityName || SUPPORTED_UNIVERSITIES.find(u => u.id === src.universityId)?.name,
+                universityId: src.universityId,
+              });
+              break;
+            }
+          } catch (e) {
+            console.warn('Could not parse stored catalog source for student info', e);
+          }
+        }
+      }).catch(console.error);
+    }
+  }, [catalogCourses.length, studentInfo]);
 
   // Handler: Import preview plan into user's own plans
   const handleImportPreviewPlan = (planToImport: SchedulePlan) => {
@@ -343,6 +395,76 @@ export default function App() {
       });
     });
     showToast(`درس «${courseToAdd.name}» جایگزین دروس متداخل شد.`, 'success');
+  };
+
+  // Handler: Toggle Star (Favorite / Priority) for a Course
+  const handleToggleStarCourse = (courseId: string) => {
+    let targetName = '';
+    let isNowStarred = false;
+
+    // 1. Check & toggle in plans
+    setPlans((prevPlans) => {
+      return prevPlans.map((p) => {
+        const found = p.courses.find((c) => c.id === courseId);
+        if (found) {
+          targetName = found.name;
+          isNowStarred = !found.isStarred;
+        }
+        return {
+          ...p,
+          courses: p.courses.map((c) => {
+            if (c.id === courseId) {
+              return { ...c, isStarred: !c.isStarred };
+            }
+            return c;
+          }),
+        };
+      });
+    });
+
+    // 2. Also toggle/sync in catalogCourses
+    setCatalogCourses((prevCatalog) => {
+      const foundInCat = prevCatalog.find((c) => c.id === courseId);
+      if (foundInCat) {
+        if (!targetName) targetName = foundInCat.name;
+        isNowStarred = !foundInCat.isStarred;
+      }
+      return prevCatalog.map((c) => {
+        if (c.id === courseId) {
+          return { ...c, isStarred: !c.isStarred };
+        }
+        return c;
+      });
+    });
+
+    if (targetName) {
+      showToast(
+        isNowStarred
+          ? `درس «${targetName}» نشان‌دار (ستاره‌دار) شد.`
+          : `نشان ستاره از درس «${targetName}» برداشته شد.`,
+        'success'
+      );
+    }
+  };
+
+  // Handler: Batch Star/Unstar Courses in Catalog and Plans
+  const handleBatchStarCourses = (courseIds: string[], star: boolean) => {
+    const idSet = new Set(courseIds);
+    setCatalogCourses((prevCatalog) =>
+      prevCatalog.map((c) => (idSet.has(c.id) ? { ...c, isStarred: star } : c))
+    );
+    setPlans((prevPlans) =>
+      prevPlans.map((p) => ({
+        ...p,
+        courses: p.courses.map((c) => (idSet.has(c.id) ? { ...c, isStarred: star } : c)),
+      }))
+    );
+    showToast(
+      star
+        ? `${toPersianDigits(courseIds.length)} درس ستاره‌دار شدند.`
+        : `نشان ستاره از ${toPersianDigits(courseIds.length)} درس برداشته شد.`,
+      'success'
+    );
   };
 
   // Global In-App Confirm Modal State
@@ -511,9 +633,9 @@ export default function App() {
     }
   };
 
-  // Trigger Print
+  // Trigger Print Preview Modal
   const handlePrint = () => {
-    window.print();
+    setIsPrintModalOpen(true);
   };
 
   const currentDisplayPlan = previewPlan || activePlan;
@@ -552,7 +674,7 @@ export default function App() {
       />
 
       {/* Main Content Area: 100% Fluid Width */}
-      <main className="flex-1 w-full p-4 sm:p-6 space-y-6">
+      <main className="flex-1 w-full p-4 sm:p-6 space-y-6 print:hidden">
         
         {/* TAB 1: WEEKLY TIMETABLE GRID */}
         {activeTab === 'grid' && (
@@ -656,6 +778,7 @@ export default function App() {
                 }}
                 onDeleteCourse={handlePromptDeleteCourse}
                 onClearAll={handleClearAllCourses}
+                onToggleStarCourse={handleToggleStarCourse}
                 isPreviewMode={Boolean(previewPlan)}
               />
             </div>
@@ -671,6 +794,7 @@ export default function App() {
                   setIsFormModalOpen(true);
                 }}
                 onDeleteCourse={handlePromptDeleteCourse}
+                onToggleStarCourse={handleToggleStarCourse}
                 onAddCourseAtSlot={(day, startTime, endTime) => {
                   setEditingCourse(null);
                   setPrefilledSlot({ day, startTime, endTime });
@@ -772,6 +896,8 @@ export default function App() {
           initialFilterSlot={catalogFilterSlot}
           showFriday={showFriday}
           onToggleFriday={() => setShowFriday(prev => !prev)}
+          onToggleStarCourse={handleToggleStarCourse}
+          onBatchStarCourses={handleBatchStarCourses}
           onEditCourse={(course) => {
             setEditingCourse(course);
             setFormModalTab('details');
@@ -979,6 +1105,17 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Print Preview & Settings Modal */}
+      <PrintScheduleModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        courses={currentDisplayPlan.courses}
+        planName={currentDisplayPlan.name}
+        studentInfo={studentInfo}
+        onUpdateStudentInfo={setStudentInfo}
+        defaultFridayVisible={showFriday}
+      />
 
       {/* Toast Notification */}
       {toastMessage && (

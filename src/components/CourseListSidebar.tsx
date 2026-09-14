@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Course } from '../types/schedule';
 import { 
   BookOpen, Plus, Trash2, Edit, Clock, 
-  User, Calendar, Search, Building2, FileText, X
+  User, Calendar, Search, Building2, FileText, X, Star
 } from 'lucide-react';
 import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
 import { GenderBadge } from './GenderBadge';
@@ -13,6 +13,7 @@ interface CourseListSidebarProps {
   onEditCourse: (course: Course) => void;
   onDeleteCourse: (courseId: string) => void;
   onClearAll: () => void;
+  onToggleStarCourse?: (courseId: string) => void;
   isPreviewMode?: boolean;
 }
 
@@ -22,6 +23,7 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
   onEditCourse,
   onDeleteCourse,
   onClearAll,
+  onToggleStarCourse,
   isPreviewMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +31,8 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
 
   // Total credits calculation
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
+  const starredCredits = courses.filter((c) => c.isStarred).reduce((sum, c) => sum + (c.credits || 0), 0);
+  const starredCount = courses.filter((c) => c.isStarred).length;
 
   // Filtered courses by search term
   const filteredCourses = courses.filter((c) => {
@@ -44,13 +48,23 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
   return (
     <div className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-indigo-200 dark:border-[#00B87C]/50 p-4 sm:p-5 shadow-xs flex flex-col gap-4 w-full transition-colors duration-200">
       
-      {/* Top Header Row: Total Credits */}
+      {/* Top Header Row: Total Credits & Starred Credits */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-[#2a2b30]">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">مجموع واحدهای انتخابی:</span>
-          <span className="text-xl font-black text-indigo-700 dark:text-emerald-400">
-            {toPersianDigits(totalCredits)} <span className="text-xs font-normal">واحد</span>
-          </span>
+        <div className="flex items-center gap-3.5 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">مجموع واحدهای انتخابی:</span>
+            <span className="text-xl font-black text-indigo-700 dark:text-emerald-400">
+              {toPersianDigits(totalCredits)} <span className="text-xs font-normal">واحد</span>
+            </span>
+          </div>
+
+          {starredCount > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs font-bold shadow-2xs animate-in fade-in duration-150">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
+              <span>{toPersianDigits(starredCredits)} واحد ستاره‌دار</span>
+              <span className="text-[10.5px] text-amber-600 dark:text-amber-400">({toPersianDigits(starredCount)} درس)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -112,7 +126,11 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
             return (
               <div
                 key={course.id}
-                className="group relative p-3 rounded-xl border border-indigo-200 dark:border-[#00B87C]/50 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs transition-all bg-white dark:bg-[#1c1d21] flex flex-col justify-between gap-2"
+                className={`group relative p-3 rounded-xl border transition-all flex flex-col justify-between gap-2 ${
+                  course.isStarred
+                    ? 'border-amber-400 dark:border-amber-500/70 ring-1 ring-amber-400/30 bg-linear-to-b from-amber-50/25 to-white dark:from-amber-950/20 dark:to-[#1c1d21] shadow-xs'
+                    : 'border-indigo-200 dark:border-[#00B87C]/50 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs bg-white dark:bg-[#1c1d21]'
+                }`}
               >
                 {/* Top Row: Color indicator, Name, Credits */}
                 <div>
@@ -122,6 +140,9 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
                       <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate" title={course.name}>
                         {course.name}
                       </span>
+                      {course.isStarred && (
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0 inline-block animate-in zoom-in-75 duration-150" title="درس ستاره‌دار (اولویت)" />
+                      )}
                     </div>
 
                     <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
@@ -195,6 +216,21 @@ export const CourseListSidebar: React.FC<CourseListSidebarProps> = ({
                 {/* Actions */}
                 {!isPreviewMode && (
                   <div className="flex items-center justify-end gap-1 pt-1 border-t border-slate-100 dark:border-[#2a2b30]/50">
+                    {onToggleStarCourse && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleStarCourse(course.id)}
+                        className={`p-1 rounded-md transition-all cursor-pointer ${
+                          course.isStarred
+                            ? 'text-amber-500 hover:text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60'
+                            : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                        title={course.isStarred ? 'حذف نشان ستاره' : 'نشان کردن به عنوان درس ستاره‌دار'}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${course.isStarred ? 'fill-amber-400 text-amber-500' : ''}`} />
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => onEditCourse(course)}

@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect, useDeferredValue } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import { Course, DayOfWeek } from '../types/schedule';
 import { 
   X, Upload, FileText, Search, BookOpen, AlertCircle, 
   CheckCircle2, User, Trash2, Building2, Sparkles, GraduationCap, Check, ArrowRight,
   Plus, ShieldAlert, Eye, EyeOff, CheckSquare, Square, MinusSquare, RotateCw, RotateCcw,
-  Clock, AlertTriangle, SlidersHorizontal, Calendar
+  Clock, AlertTriangle, SlidersHorizontal, Calendar, Star
 } from 'lucide-react';
 import { parseUniversityHtml, SUPPORTED_UNIVERSITIES, UniversityId, detectUniversity, detectCandidateUniversities, validateUniversitySchema, UniversityInfo } from '../utils/parsers';
 import { saveFreshCatalogSource, appendCatalogSource, getCatalogSources, getCatalogSourcesCount, clearCatalogSources } from '../utils/catalogStorage';
@@ -71,6 +71,8 @@ interface CourseCatalogModalProps {
   showFriday?: boolean;
   onToggleFriday?: () => void;
   onEditCourse?: (course: Course) => void;
+  onToggleStarCourse?: (courseId: string) => void;
+  onBatchStarCourses?: (courseIds: string[], star: boolean) => void;
 }
 
 // Function to generate a deterministic unique key for a course (for deduplication / Set behavior)
@@ -124,7 +126,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   initialFilterSlot,
   showFriday,
   onToggleFriday,
-  onEditCourse
+  onEditCourse,
+  onToggleStarCourse,
+  onBatchStarCourses
 }) => {
   // Active Tab in Catalog Modal: 'list' (Courses Catalog list) | 'timetable' (Weekly Schedule Timetable)
   const [activeCatalogTab, setActiveCatalogTab] = useState<'list' | 'timetable'>('list');
@@ -142,8 +146,8 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   // Selection state for batch operations
   const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(new Set());
 
-  // Visibility filter: 'active' (non-hidden), 'hidden' (only hidden), 'added' (registered in plan), 'all' (all courses)
-  const [visibilityFilter, setVisibilityFilter] = useState<'active' | 'hidden' | 'added' | 'all'>('active');
+  // Visibility filter: 'active' (non-hidden), 'starred' (only starred), 'hidden' (only hidden), 'added' (registered in plan), 'all' (all courses)
+  const [visibilityFilter, setVisibilityFilter] = useState<'active' | 'starred' | 'hidden' | 'added' | 'all'>('active');
 
   // University Mismatch Modal Alert
   const [universityMismatchModal, setUniversityMismatchModal] = useState<{
@@ -182,6 +186,72 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const [timeFilterEnd, setTimeFilterEnd] = useState<string>('20:00');
   const [isTimeFilterActive, setIsTimeFilterActive] = useState<boolean>(false);
   const [timeFilterError, setTimeFilterError] = useState<string | null>(null);
+
+  // Time Range Filter Popover Ref & Smart Alignment
+  const timeFilterContainerRef = useRef<HTMLDivElement>(null);
+  const [timePopoverAlign, setTimePopoverAlign] = useState<'right' | 'left'>('right');
+
+  // Compute smart popover alignment whenever it opens or window resizes
+  const updateAlignment = useCallback(() => {
+    if (timeFilterContainerRef.current) {
+      const rect = timeFilterContainerRef.current.getBoundingClientRect();
+      const modalEl = timeFilterContainerRef.current.closest('.sm\\:max-w-7xl') || document.body;
+      const containerRect = modalEl.getBoundingClientRect();
+
+      // Width of popover in sm: breakpoint is 320px (w-80) + padding buffer = 340px
+      const POPOVER_WIDTH = 340;
+      const spaceOnRight = containerRect.right - rect.left;
+      const spaceOnLeft = rect.right - containerRect.left;
+
+      // If not enough space on right of button inside modal, popover must align right (opens leftwards into modal)
+      if (spaceOnRight < POPOVER_WIDTH) {
+        setTimePopoverAlign('right');
+      } else if (spaceOnLeft < POPOVER_WIDTH) {
+        // If not enough space on left of button inside modal, popover must align left (opens rightwards into modal)
+        setTimePopoverAlign('left');
+      } else {
+        // Both sides have enough space: open towards the center of the modal
+        const modalCenter = containerRect.left + containerRect.width / 2;
+        const buttonCenter = rect.left + rect.width / 2;
+        setTimePopoverAlign(buttonCenter > modalCenter ? 'right' : 'left');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isTimeFilterOpen) return;
+
+    updateAlignment();
+    window.addEventListener('resize', updateAlignment);
+    return () => window.removeEventListener('resize', updateAlignment);
+  }, [isTimeFilterOpen, updateAlignment]);
+
+  // Click outside & Escape key to naturally close time filter popover
+  useEffect(() => {
+    if (!isTimeFilterOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        timeFilterContainerRef.current &&
+        !timeFilterContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsTimeFilterOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsTimeFilterOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTimeFilterOpen]);
 
   // Storage keys for persisting catalog filter checkboxes
   const HIDE_CONFLICTING_KEY = 'unischedule_catalog_hide_conflicting';
@@ -330,6 +400,7 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   const addedCount = courseValidationMap.addedCount;
   const conflictingCoursesCount = courseValidationMap.conflictCount;
   const warningCoursesCount = courseValidationMap.warningCount;
+  const starredCount = useMemo(() => catalogCourses.filter(c => Boolean(c.isStarred)).length, [catalogCourses]);
 
   // Extract unique faculties if present
   const availableFaculties = useMemo(() => {
@@ -727,8 +798,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       const isAdded = meta?.isAdded ?? false;
       const effectivelyHidden = meta?.isEffectivelyHidden ?? false;
 
-      // Dynamic Visibility Filter (Active, Hidden, Added, All)
+      // Dynamic Visibility Filter (Active, Starred, Hidden, Added, All)
       if (visibilityFilter === 'active' && effectivelyHidden) return false;
+      if (visibilityFilter === 'starred' && !course.isStarred) return false;
       if (visibilityFilter === 'hidden' && !effectivelyHidden) return false;
       if (visibilityFilter === 'added' && !isAdded) return false;
 
@@ -861,6 +933,30 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   };
 
   // Single Course Actions
+  const handleToggleStarSingleCourse = (courseId: string) => {
+    if (onToggleStarCourse) {
+      onToggleStarCourse(courseId);
+    } else {
+      const target = catalogCourses.find(c => c.id === courseId);
+      const isNowStarred = !target?.isStarred;
+      const updated = catalogCourses.map(c => {
+        if (c.id === courseId) {
+          return { ...c, isStarred: isNowStarred };
+        }
+        return c;
+      });
+      setCatalogCourses(updated);
+      if (target) {
+        setDetectedToast(
+          isNowStarred
+            ? `درس «${target.name}» ستاره‌دار (نشان‌دار) شد.`
+            : `نشان ستاره از درس «${target.name}» برداشته شد.`
+        );
+        setTimeout(() => setDetectedToast(null), 3000);
+      }
+    }
+  };
+
   const handleToggleHideSingleCourse = (courseId: string) => {
     const updated = catalogCourses.map(c => {
       if (c.id === courseId) {
@@ -882,7 +978,12 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       cancelText: 'انصراف',
       variant: 'danger',
       onConfirm: () => {
-        setCatalogCourses(catalogCourses.filter(c => c.id !== courseId));
+        const updated = catalogCourses.filter(c => c.id !== courseId);
+        setCatalogCourses(updated);
+        if (updated.length === 0) {
+          setStudentInfo(null);
+          clearCatalogSources().catch(console.error);
+        }
         setSelectedCourseIds(prev => {
           const next = new Set(prev);
           next.delete(courseId);
@@ -931,6 +1032,26 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
   };
 
   // Batch Actions
+  const handleBatchStar = (star: boolean) => {
+    const ids = Array.from(selectedCourseIds);
+    if (ids.length === 0) return;
+    if (onBatchStarCourses) {
+      onBatchStarCourses(ids, star);
+    } else {
+      const idSet = new Set(ids);
+      setCatalogCourses(
+        catalogCourses.map(c => idSet.has(c.id) ? { ...c, isStarred: star } : c)
+      );
+      setDetectedToast(
+        star
+          ? `تعداد ${toPersianDigits(ids.length)} درس با موفقیت ستاره‌دار شدند.`
+          : `نشان ستاره از ${toPersianDigits(ids.length)} درس برداشته شد.`
+      );
+      setTimeout(() => setDetectedToast(null), 3000);
+    }
+    setSelectedCourseIds(new Set());
+  };
+
   const handleBatchHide = (hide: boolean) => {
     if (selectedCourseIds.size === 0) return;
     const count = selectedCourseIds.size;
@@ -963,6 +1084,10 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
       onConfirm: () => {
         const updated = catalogCourses.filter(c => !selectedCourseIds.has(c.id));
         setCatalogCourses(updated);
+        if (updated.length === 0) {
+          setStudentInfo(null);
+          clearCatalogSources().catch(console.error);
+        }
         setSelectedCourseIds(new Set());
         setDetectedToast(`تعداد ${toPersianDigits(count)} درس از بانک دروس حذف شدند.`);
         setTimeout(() => setDetectedToast(null), 3500);
@@ -1682,22 +1807,25 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                     )}
                   </div>
 
-                  {/* Visibility Filter (Active, Added, Hidden, All) */}
+                  {/* Visibility Filter (Active, Starred, Added, Hidden, All) */}
                   <div>
                     <select
                       value={visibilityFilter}
                       onChange={(e) => setVisibilityFilter(e.target.value as any)}
                       className={`w-full h-10 border rounded-xl px-2.5 text-xs font-bold focus:outline-none transition-all ${
-                        visibilityFilter === 'hidden'
-                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 ring-1 ring-amber-400/20 shadow-xs'
-                          : visibilityFilter === 'added'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-200 ring-1 ring-emerald-500/20 shadow-xs'
-                            : visibilityFilter === 'all'
-                              ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
-                              : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
+                        visibilityFilter === 'starred'
+                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 ring-1 ring-amber-400/20 shadow-xs'
+                          : visibilityFilter === 'hidden'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 ring-1 ring-amber-400/20 shadow-xs'
+                            : visibilityFilter === 'added'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-200 ring-1 ring-emerald-500/20 shadow-xs'
+                              : visibilityFilter === 'all'
+                                ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 ring-1 ring-indigo-500/20 dark:ring-emerald-500/20 shadow-xs'
+                                : 'bg-slate-50 dark:bg-[#0b0c0e] border-slate-200 dark:border-[#2a2b30] text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500'
                       }`}
                     >
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="active">دروس فعال ({toPersianDigits(activeCount)})</option>
+                      <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="starred">دروس ستاره‌دار ({toPersianDigits(starredCount)})</option>
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="added">ثبت شده در برنامه ({toPersianDigits(addedCount)})</option>
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="hidden">پنهان‌شده‌ها ({toPersianDigits(hiddenCount)})</option>
                       <option className="bg-white dark:bg-[#18191d] text-slate-800 dark:text-slate-100" value="all">همه دروس ({toPersianDigits(catalogCourses.length)})</option>
@@ -1788,10 +1916,15 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                   </div>
 
                   {/* Time Range Filter Button with Popover */}
-                  <div className="relative">
+                  <div className="relative" ref={timeFilterContainerRef}>
                     <button
                       type="button"
-                      onClick={() => setIsTimeFilterOpen(!isTimeFilterOpen)}
+                      onClick={() => {
+                        if (!isTimeFilterOpen) {
+                          updateAlignment();
+                        }
+                        setIsTimeFilterOpen(!isTimeFilterOpen);
+                      }}
                       className={`w-full h-10 px-3 rounded-xl text-xs font-bold flex items-center justify-between border transition-all cursor-pointer ${
                         isTimeFilterActive
                           ? 'bg-indigo-50 dark:bg-emerald-950/40 border-indigo-300 dark:border-emerald-600 text-indigo-700 dark:text-emerald-300 shadow-xs'
@@ -1824,7 +1957,9 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
                     {/* Time Range Popover */}
                     {isTimeFilterOpen && (
-                      <div className="absolute top-12 left-0 right-0 sm:right-auto sm:w-80 bg-white dark:bg-[#18191d] rounded-2xl shadow-xl border border-slate-200 dark:border-[#2a2b30] p-4 z-40 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                      <div className={`absolute top-12 left-0 right-0 sm:w-80 bg-white dark:bg-[#18191d] rounded-2xl shadow-xl border border-slate-200 dark:border-[#2a2b30] p-4 z-40 space-y-3 animate-in fade-in zoom-in-95 duration-150 ${
+                        timePopoverAlign === 'right' ? 'sm:right-0 sm:left-auto' : 'sm:left-0 sm:right-auto'
+                      }`}>
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#2a2b30]">
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-emerald-400" />
@@ -2025,6 +2160,28 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                         {toPersianDigits(selectedCourseIds.size)} درس انتخاب شد:
                       </span>
 
+                      {/* Star Selected */}
+                      <button
+                        type="button"
+                        onClick={() => handleBatchStar(true)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/80 rounded-lg transition-colors cursor-pointer"
+                        title="ستاره‌دار کردن تمام دروس انتخاب شده"
+                      >
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                        <span>ستاره‌دار</span>
+                      </button>
+
+                      {/* Unstar Selected */}
+                      <button
+                        type="button"
+                        onClick={() => handleBatchStar(false)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-200/80 hover:bg-slate-300/80 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                        title="حذف ستاره از تمام دروس انتخاب شده"
+                      >
+                        <Star className="w-3.5 h-3.5 text-slate-400" />
+                        <span>لغو ستاره</span>
+                      </button>
+
                       {/* Hide Selected */}
                       <button
                         type="button"
@@ -2104,11 +2261,13 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                               ? 'border-indigo-500 dark:border-emerald-500 ring-2 ring-indigo-500/30 dark:ring-emerald-500/30'
                               : isAdded 
                                 ? 'border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs' 
-                                : hasConflict 
-                                  ? 'border-rose-200 dark:border-rose-900/50 shadow-xs'
-                                  : hasDuplicateWarning
-                                    ? 'border-amber-300 dark:border-amber-700/70 ring-2 ring-amber-400/20 shadow-xs'
-                                    : 'border-slate-200 dark:border-[#2a2b30] shadow-xs'
+                                : course.isStarred
+                                  ? 'border-amber-400 dark:border-amber-500/70 ring-1 ring-amber-400/30 bg-linear-to-b from-amber-50/20 dark:from-amber-950/10 to-transparent shadow-xs'
+                                  : hasConflict 
+                                    ? 'border-rose-200 dark:border-rose-900/50 shadow-xs'
+                                    : hasDuplicateWarning
+                                      ? 'border-amber-300 dark:border-amber-700/70 ring-2 ring-amber-400/20 shadow-xs'
+                                      : 'border-slate-200 dark:border-[#2a2b30] shadow-xs'
                           } ${isHidden ? 'opacity-70 dark:opacity-60 bg-slate-50/80 dark:bg-[#0f1013]' : ''}`}
                         >
                           <div className="p-4 sm:p-5 flex-1 space-y-3.5">
@@ -2135,8 +2294,11 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
 
                                 <div className="space-y-1.5 flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-slate-100 leading-snug">
-                                      {course.name}
+                                    <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-slate-100 leading-snug flex items-center gap-1.5">
+                                      <span>{course.name}</span>
+                                      {course.isStarred && (
+                                        <Star className="w-4 h-4 fill-amber-400 text-amber-500 shrink-0 inline-block animate-in zoom-in-75 duration-150" title="درس ستاره‌دار" />
+                                      )}
                                     </h4>
 
                                     {isHidden && (
@@ -2203,8 +2365,24 @@ export const CourseCatalogModal: React.FC<CourseCatalogModalProps> = ({
                                 </div>
                               </div>
 
-                              {/* Single Course Action Icons (Hide / Delete from Catalog) */}
+                              {/* Single Course Action Icons (Star / Hide / Delete from Catalog) */}
                               <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStarSingleCourse(course.id);
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                    course.isStarred
+                                      ? 'text-amber-500 hover:text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 scale-105'
+                                      : 'text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                                  }`}
+                                  title={course.isStarred ? 'حذف نشان ستاره' : 'نشان کردن به عنوان درس ستاره‌دار (اولویت)'}
+                                >
+                                  <Star className={`w-4 h-4 ${course.isStarred ? 'fill-amber-400 text-amber-500' : ''}`} />
+                                </button>
+
                                 <button
                                   type="button"
                                   onClick={() => handleToggleHideSingleCourse(course.id)}

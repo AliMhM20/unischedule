@@ -25,12 +25,22 @@
 
 @media print {
   @page {
-    margin: 1cm;
+    margin: 6mm;
     size: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
   }
   body {
     background-color: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 

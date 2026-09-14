@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Calendar, Clock, AlertTriangle, CheckCircle2, Edit } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, CheckCircle2, Edit, Star } from 'lucide-react';
 import { Course } from '../types/schedule';
 import { COLOR_PALETTE, toPersianDigits, findExamConflicts, formatExamDate } from '../utils/timeUtils';
 
@@ -147,7 +147,11 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
             return (
               <div
                 key={course.id}
-                className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-indigo-200 dark:border-[#00B87C]/50 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between p-5 space-y-4"
+                className={`bg-white dark:bg-[#1c1d21] rounded-2xl border shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between p-5 space-y-4 ${
+                  course.isStarred
+                    ? 'border-amber-400 dark:border-amber-500/70 ring-1 ring-amber-400/30 bg-linear-to-b from-amber-50/25 to-white dark:from-amber-950/20 dark:to-[#1c1d21]'
+                    : 'border-indigo-200 dark:border-[#00B87C]/50'
+                }`}
               >
                 {/* Top Badge */}
                 <div className="flex items-start justify-between">
@@ -156,8 +160,11 @@ export const ExamTimelineView: React.FC<ExamTimelineViewProps> = ({
                       {toPersianDigits(index + 1)}
                     </span>
                     <div>
-                      <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
-                        {course.name}
+                      <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <span>{course.name}</span>
+                        {course.isStarred && (
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0 inline-block animate-in zoom-in-75 duration-150" title="درس ستاره‌دار (اولویت)" />
+                        )}
                       </h3>
                       {course.instructor && (
                         <span className="text-xs text-slate-500 dark:text-slate-400">

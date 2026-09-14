@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Course, DayOfWeek, ClassSession } from '../types/schedule';
 import { 
   Plus, Calendar, Clock, User, AlertTriangle, 
-  Trash2, Edit, X, Info, Sparkles, HelpCircle, BookOpen, FileText
+  Trash2, Edit, X, Info, Sparkles, HelpCircle, BookOpen, FileText, Star
 } from 'lucide-react';
 import { toPersianDigits, getDayFaName, getCourseTheme, formatExamDate } from '../utils/timeUtils';
 
@@ -11,6 +11,7 @@ interface TimetableGridProps {
   onEditCourse: (course: Course) => void;
   onDeleteCourse: (courseId: string) => void;
   onAddCourseAtSlot: (day: DayOfWeek, startTime: string, endTime: string) => void;
+  onToggleStarCourse?: (courseId: string) => void;
   onSelectGapFromCatalog?: (
     day: DayOfWeek, 
     startTime: string, 
@@ -63,6 +64,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   onEditCourse,
   onDeleteCourse,
   onAddCourseAtSlot,
+  onToggleStarCourse,
   onSelectGapFromCatalog,
   showFriday,
   onToggleFriday,
@@ -527,8 +529,11 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                         {/* Course Name & Credits */}
                         <div>
                           <div className="flex items-start justify-between gap-1">
-                            <span className="font-black text-[10.5px] sm:text-xs leading-tight line-clamp-1">
-                              {course.name}
+                            <span className="font-black text-[10.5px] sm:text-xs leading-tight line-clamp-1 flex items-center gap-1 min-w-0">
+                              <span className="truncate">{course.name}</span>
+                              {course.isStarred && (
+                                <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-amber-400 text-amber-500 shrink-0 inline-block" title="درس ستاره‌دار (اولویت)" />
+                              )}
                             </span>
                             <span className={`text-[9px] sm:text-[10px] font-black px-1 py-0.2 rounded shrink-0 ${theme.bg} ${theme.text}`}>
                               {toPersianDigits(course.credits)}و
@@ -595,19 +600,44 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             className="bg-white dark:bg-[#1c1d21] rounded-2xl border border-slate-200 dark:border-[#2a2b30] shadow-xl max-w-sm w-full p-5 space-y-4 transition-colors duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-[11px] font-extrabold text-indigo-600 dark:text-emerald-500">مشخصات درس</span>
-                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5">
-                  {selectedCourseCard.course.name}
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5 flex items-center gap-1.5">
+                  <span>{selectedCourseCard.course.name}</span>
+                  {selectedCourseCard.course.isStarred && (
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-500 shrink-0 inline-block" title="درس ستاره‌دار" />
+                  )}
                 </h3>
               </div>
-              <button 
-                onClick={() => setSelectedCourseCard(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {onToggleStarCourse && !isPreviewMode && (
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      onToggleStarCourse(selectedCourseCard.course.id);
+                      setSelectedCourseCard(prev => prev ? {
+                        ...prev,
+                        course: { ...prev.course, isStarred: !prev.course.isStarred }
+                      } : null);
+                    }}
+                    className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                      selectedCourseCard.course.isStarred
+                        ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                        : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                    title={selectedCourseCard.course.isStarred ? 'حذف نشان ستاره' : 'نشان کردن به عنوان درس ستاره‌دار'}
+                  >
+                    <Star className={`w-4 h-4 ${selectedCourseCard.course.isStarred ? 'fill-amber-400 text-amber-500' : ''}`} />
+                  </button>
+                )}
+                <button 
+                  onClick={() => setSelectedCourseCard(null)}
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[#1c1d21]/80 p-3 rounded-xl border border-slate-100 dark:border-[#2a2b30]">

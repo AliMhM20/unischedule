@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Plus, Trash2, Calendar, Clock, AlertTriangle, CheckCircle2, 
-  User, BookOpen, Hash, Users 
+  User, BookOpen, Hash, Users, Star
 } from 'lucide-react';
 import { Course, ClassSession, DayOfWeek, ExamInfo } from '../types/schedule';
 import { 
@@ -59,6 +59,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
   const [color, setColor] = useState('blue');
   const [gender, setGender] = useState<'mixed' | 'men' | 'women' | undefined>(undefined);
   const [notes, setNotes] = useState('');
+  const [isStarred, setIsStarred] = useState(false);
 
   // Class sessions
   const [sessions, setSessions] = useState<ClassSession[]>([
@@ -104,6 +105,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         setColor(initialCourse.color);
         setGender(initialCourse.gender || undefined);
         setNotes(initialCourse.notes || '');
+        setIsStarred(Boolean(initialCourse.isStarred));
         setSessions(
           initialCourse.sessions && initialCourse.sessions.length > 0
             ? initialCourse.sessions
@@ -134,6 +136,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
         setColor(randomColor);
         setGender(undefined);
         setNotes('');
+        setIsStarred(false);
         setHasExam(true);
 
         if (prefilledSlot) {
@@ -320,6 +323,7 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
       sessions,
       exam: currentExamInfo,
       notes: notes.trim() || undefined,
+      isStarred: isStarred || undefined,
       createdAt: initialCourse ? initialCourse.createdAt : Date.now(),
     };
 
@@ -523,6 +527,45 @@ export const CourseFormModal: React.FC<CourseFormModalProps> = ({
                   placeholder="یادداشت‌های مربوط به درس"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-[#383a40] bg-white dark:bg-[#131416] focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-emerald-500 text-slate-800 dark:text-slate-100 text-sm transition-colors"
                 />
+              </div>
+
+              {/* Starred / Priority Course Toggle */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsStarred(prev => !prev)}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    isStarred
+                      ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 ring-2 ring-amber-400/20 shadow-xs'
+                      : 'bg-slate-50/60 dark:bg-[#131416] border-slate-200 dark:border-[#383a40] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1c1d21]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                      isStarred
+                        ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400'
+                        : 'bg-slate-200/70 dark:bg-slate-800 text-slate-400'
+                    }`}>
+                      <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-500' : ''}`} />
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-xs sm:text-sm font-bold">
+                        نشان‌کردن به عنوان درس اولویت‌دار (ستاره‌دار)
+                      </span>
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                        دروس ستاره‌دار با نشان طلایی در جدول و تقویم امتحانات برجسته می‌شوند
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                    isStarred
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                  }`}>
+                    {isStarred && <CheckCircle2 className="w-4 h-4" />}
+                  </div>
+                </button>
               </div>
 
             </div>
